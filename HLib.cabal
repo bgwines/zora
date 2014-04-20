@@ -1,0 +1,15 @@
+Name:		HLib
+Version:	1.0.0
+Cabal-Version:  >= 1.2
+License:	BSD3
+Author:		Brett Wines
+Homepage:	http://hlib.sourceforge.net/
+Category:	Library
+Synopsis:	A library of useful functions for Haskell
+Build-Type: Simple
+
+Library
+  Build-Depends: base, random, containers
+  --Other-Modules: memocombinators
+  Exposed-Modules:
+    HLib

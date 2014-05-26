@@ -17,11 +17,11 @@ version :: Version
 version = Version {versionBranch = [1,0,0], versionTags = []}
 bindir, libdir, datadir, libexecdir, sysconfdir :: FilePath
 
-bindir     = "/Users/brett/.cabal/bin"
-libdir     = "/Users/brett/.cabal/lib/x86_64-osx-ghc-7.6.3/HLib-1.0.0"
-datadir    = "/Users/brett/.cabal/share/x86_64-osx-ghc-7.6.3/HLib-1.0.0"
-libexecdir = "/Users/brett/.cabal/libexec"
-sysconfdir = "/Users/brett/.cabal/etc"
+bindir     = "/usr/local/bin"
+libdir     = "/usr/local/lib/x86_64-osx-ghc-7.6.3/HLib-1.0.0"
+datadir    = "/usr/local/share/x86_64-osx-ghc-7.6.3/HLib-1.0.0"
+libexecdir = "/usr/local/libexec"
+sysconfdir = "/usr/local/etc"
 
 getBinDir, getLibDir, getDataDir, getLibexecDir, getSysconfDir :: IO FilePath
 getBinDir = catchIO (getEnv "HLib_bindir") (\_ -> return bindir)

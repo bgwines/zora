@@ -12,7 +12,6 @@ module HLib
 , fill_set
 , find
 , find_guaranteed
-, from_just
 , fromRealFrac
 , gen_cycles
 , gen_perms
@@ -28,6 +27,7 @@ module HLib
 , map_keep
 , maximum_with_index
 , merge
+, mergeBy
 , mergesort
 , pair
 , pairify
@@ -51,13 +51,17 @@ module HLib
 , snd3
 , trd3
 , partition
+, partition_with_block_size
 , takeWhileAndRest
+, zipWhile
 ) where
 
 import qualified Data.List as List
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import System.Random
+
+import Data.Maybe
 
 get_next_partitions :: a -> [[a]] -> [[[a]]]
 get_next_partitions e l =
@@ -127,14 +131,14 @@ decyclify :: (Eq a) => [a] -> [a]
 decyclify l =
     let
         i       = alg1 (tail l) (tail . tail $ l)
-        i'      = from_just i
+        i'      = fromJust i
 
         mu      = if (i  == Nothing) then Nothing else alg2 l (drop' i' l)
-        mu'     = fromInteger . from_just $ mu
-        mu''    = from_just mu
+        mu'     = fromInteger . fromJust $ mu
+        mu''    = fromJust mu
 
         lambda  = if (mu == Nothing) then Nothing else alg3 (drop (mu' + 1) l) (l !! mu')
-        lambda' = from_just lambda
+        lambda' = fromJust lambda
     in
         if lambda /= Nothing then
             take' (lambda' + mu'') l
@@ -335,9 +339,6 @@ euler_phi n = product
     where
         format l = (head l, (toInteger . length) l) 
 
-from_just :: Maybe a -> a
-from_just (Just x) = x
-
 fromRealFrac :: Integer -> Double
 fromRealFrac = fromRational . toRational
 
@@ -440,13 +441,6 @@ maximum_with_index :: (Ord a) => [a] -> (a, Integer)
 maximum_with_index xs =
 	List.maximumBy (Ord.comparing fst) (zip xs [0..])
 
---merge :: (Ord a) => [a] -> [a] -> [a]
---merge xs@(x:xt) ys@(y:yt) = 
---  case compare x y of
---  LT -> x : (merge xt ys)
---  EQ -> x : (merge xt yt)
---  GT -> y : (merge xs yt)
-
 mergesort :: (Ord a) => [a] -> [a]
 mergesort l
     | length l == 0 || length l == 1 = l
@@ -456,12 +450,23 @@ mergesort l
         in merge (mergesort a) (mergesort b)
 
 merge :: (Ord a) => [a] -> [a] -> [a]
-merge a b
-	| length a == 0 = b
-	| length b == 0 = a
-	| otherwise = case (head a < head b) of
-	            True  -> head a : merge (tail a) b
-	            False -> head b : merge a (tail b)
+merge = mergeBy compare
+
+mergeBy :: (Ord a) => (a -> a -> Ordering) -> [a] -> [a] -> [a]
+mergeBy cmp as bs
+    | length as == 0 = bs
+    | length bs == 0 = as
+    | otherwise =
+        let
+            a = head as
+            b = head bs
+            as' = tail as
+            bs' = tail bs
+        in
+            case cmp a b of
+                    LT -> a : mergeBy cmp as' bs
+                    EQ -> a : mergeBy cmp as' bs
+                    GT -> b : mergeBy cmp as  bs'
 
 diff :: (Ord a) => [a] -> [a] -> [a]
 diff xs@(x:xt) ys@(y:yt) = 
@@ -477,6 +482,7 @@ merge_infinite xs@(x:xt) ys@(y:yt) =
     EQ -> x : (merge_infinite xt yt)
     GT -> y : (merge_infinite xs yt)
 
+-- http://en.literateprograms.org/Sieve_of_Eratosthenes_(Haskell)
 primes :: [Integer]
 nonprimes :: [Integer]
 primes    = [2, 3, 5] ++ (diff [7, 9 ..] nonprimes) 
@@ -505,9 +511,15 @@ partition len l =
         then [l]
         else (take len l) : (partition len (drop len l))
 
+partition_with_block_size :: Int -> [a] -> [[a]]
+partition_with_block_size = partition
+
 takeWhileAndRest :: (a -> Bool) -> [a] -> ([a], [a])
 takeWhileAndRest f [] = ([], [])
 takeWhileAndRest f l@(x:xs) = if not (f x)
     then ([], l)
     else (x:(fst rec), snd rec)
         where rec = takeWhileAndRest f xs
+
+zipWhile :: (a -> b -> Bool) -> [a] -> [b] -> [(a, b)]
+zipWhile f as bs = takeWhile (\(a, b) -> f a b) $ zip as bs

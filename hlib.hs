@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module HLib
 ( primes
 , is_prime
@@ -54,6 +56,10 @@ module HLib
 , partition_with_block_size
 , takeWhileAndRest
 , zipWhile
+, contains_duplicates
+, sorted_contains_duplicates
+, cons
+, snoc
 ) where
 
 import qualified Data.List as List
@@ -523,3 +529,24 @@ takeWhileAndRest f l@(x:xs) = if not (f x)
 
 zipWhile :: (a -> b -> Bool) -> [a] -> [b] -> [(a, b)]
 zipWhile f as bs = takeWhile (\(a, b) -> f a b) $ zip as bs
+
+-- TODO: do this more monadically?
+contains_duplicates :: forall a . (Ord a) => [a] -> Bool
+contains_duplicates l = (foldr (insert) (Just Set.empty) l) == Nothing
+    where
+        insert :: a -> Maybe (Set.Set a) -> Maybe (Set.Set a)
+        insert a s = if s == Nothing
+            then Nothing
+            else if Set.member a (fromJust s)
+                then Nothing
+                else Just (Set.insert a (fromJust s))
+
+sorted_contains_duplicates :: (Eq a) => [a] -> Bool
+sorted_contains_duplicates [] = False
+sorted_contains_duplicates l = or $ zipWith (==) l (tail l)
+
+cons :: a -> [a] -> [a]
+cons = (:)
+
+snoc :: a -> [a] -> [a]
+snoc e l = l ++ [e]

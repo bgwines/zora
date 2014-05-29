@@ -54,6 +54,7 @@ module HLib
 , trd3
 , partition
 , partition_with_block_size
+, partition_into_k
 , takeWhileAndRest
 , zipWhile
 , contains_duplicates
@@ -511,6 +512,7 @@ coprime :: Integer -> Integer -> Bool
 coprime a b = Nothing == find is_common_divisor [2..(min a b)]
   where is_common_divisor n = (a `mod` n == 0) && (b `mod` n == 0)
 
+-- TODO: could be O(n)
 partition :: Int -> [a] -> [[a]]
 partition len l =
     if (length l) <= len
@@ -519,6 +521,14 @@ partition len l =
 
 partition_with_block_size :: Int -> [a] -> [[a]]
 partition_with_block_size = partition
+
+partition_into_k :: Int -> [a] -> [[a]]
+partition_into_k k arr = partition_with_block_size block_size arr
+    where
+        block_size :: Int
+        block_size = if (((length arr) `mod` k) == 0)
+            then (length arr) `div` k
+            else (length arr) `div` k + 1
 
 takeWhileAndRest :: (a -> Bool) -> [a] -> ([a], [a])
 takeWhileAndRest f [] = ([], [])

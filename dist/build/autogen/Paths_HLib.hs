@@ -14,12 +14,12 @@ catchIO = Exception.catch
 
 
 version :: Version
-version = Version {versionBranch = [1,0,1], versionTags = []}
+version = Version {versionBranch = [1,0,2], versionTags = []}
 bindir, libdir, datadir, libexecdir, sysconfdir :: FilePath
 
 bindir     = "/usr/local/bin"
-libdir     = "/usr/local/lib/x86_64-osx-ghc-7.6.3/HLib-1.0.1"
-datadir    = "/usr/local/share/x86_64-osx-ghc-7.6.3/HLib-1.0.1"
+libdir     = "/usr/local/lib/x86_64-osx-ghc-7.6.3/HLib-1.0.2"
+datadir    = "/usr/local/share/x86_64-osx-ghc-7.6.3/HLib-1.0.2"
 libexecdir = "/usr/local/libexec"
 sysconfdir = "/usr/local/etc"
 

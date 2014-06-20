@@ -66,6 +66,7 @@ module HLib
 , is_sorted
 , safe_tail
 , Zoldable
+, zoldMap
 ) where
 
 import qualified Data.List as List

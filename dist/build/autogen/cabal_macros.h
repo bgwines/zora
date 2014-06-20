@@ -28,12 +28,12 @@
   (major1) == 3 && (major2) <  0 || \
   (major1) == 3 && (major2) == 0 && (minor) <= 5)
 
-/* tool gcc-4.8.3 */
-#define TOOL_VERSION_gcc "4.8.3"
+/* tool gcc-4.2.1 */
+#define TOOL_VERSION_gcc "4.2.1"
 #define MIN_TOOL_VERSION_gcc(major1,major2,minor) (\
   (major1) <  4 || \
-  (major1) == 4 && (major2) <  8 || \
-  (major1) == 4 && (major2) == 8 && (minor) <= 3)
+  (major1) == 4 && (major2) <  2 || \
+  (major1) == 4 && (major2) == 2 && (minor) <= 1)
 
 /* tool ghc-7.6.3 */
 #define TOOL_VERSION_ghc "7.6.3"

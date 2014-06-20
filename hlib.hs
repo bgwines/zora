@@ -31,8 +31,6 @@ module HLib
 , merge
 , mergeBy
 , mergesort
-, pair
-, pairify
 , powerpartition
 , powerset
 , random_integers
@@ -61,11 +59,20 @@ module HLib
 , sorted_contains_duplicates
 , cons
 , snoc
+, pair
+, pairAppend
+, pairMap
+, pairify
+, is_sorted
+, safe_tail
+, Zoldable
 ) where
 
 import qualified Data.List as List
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
+
+import Data.Monoid
 import System.Random
 
 import Data.Maybe
@@ -279,9 +286,6 @@ to_int = (toInteger . round)
 
 triple :: a -> b -> c -> (a, b, c)
 triple a b c = (a, b, c)
-
-pair :: a -> b -> (a, b)
-pair a b = (a, b)
 
 map_keep :: (a -> b) -> [a] -> [(a, b)]
 map_keep f l = zipWith pair l (map f l)
@@ -560,3 +564,22 @@ cons = (:)
 
 snoc :: a -> [a] -> [a]
 snoc e l = l ++ [e]
+
+pair :: a -> b -> (a, b)
+pair a b = (a, b)
+
+pairAppend :: (a, b) -> c -> (a, b, c)
+pairAppend (a, b) c = (a, b, c)
+
+pairMap :: (a -> b) -> (a, a) -> (b, b)
+pairMap f (a, a') = (f a, f a')
+
+is_sorted :: (Ord a) => [a] -> Bool
+is_sorted l = and $ zipWith (<=) l (tail l)
+
+safe_tail :: [a] -> [a]
+safe_tail [] = []
+safe_tail l = tail l
+
+class Zoldable z where
+    zoldMap :: (Monoid m) => (z a -> m) -> z a -> m

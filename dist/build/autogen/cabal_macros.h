@@ -7,6 +7,13 @@
   (major1) == 4 && (major2) <  6 || \
   (major1) == 4 && (major2) == 6 && (minor) <= 0)
 
+/* package bytestring-0.10.0.2 */
+#define VERSION_bytestring "0.10.0.2"
+#define MIN_VERSION_bytestring(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  10 || \
+  (major1) == 0 && (major2) == 10 && (minor) <= 0)
+
 /* package containers-0.5.0.0 */
 #define VERSION_containers "0.5.0.0"
 #define MIN_VERSION_containers(major1,major2,minor) (\
@@ -20,6 +27,13 @@
   (major1) <  1 || \
   (major1) == 1 && (major2) <  0 || \
   (major1) == 1 && (major2) == 0 && (minor) <= 1)
+
+/* package text-0.11.3.1 */
+#define VERSION_text "0.11.3.1"
+#define MIN_VERSION_text(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  11 || \
+  (major1) == 0 && (major2) == 11 && (minor) <= 3)
 
 /* tool alex-3.0.5 */
 #define TOOL_VERSION_alex "3.0.5"

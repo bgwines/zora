@@ -1,4 +1,4 @@
-hlib
+Zora
 ====
 
 A library of functions, originally written as helper functions for Project Euler problems.
@@ -6,6 +6,4 @@ A library of functions, originally written as helper functions for Project Euler
 Installation
 ------------
 
-    runhaskell Setup.hs configure --ghc
-    runhaskell Setup.hs build
-    runhaskell Setup.hs install
+    cabal install zora

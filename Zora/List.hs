@@ -23,9 +23,9 @@ module Zora.List
 
 -- * Permutations, combinations, and cycles
 , powerset
-, gen_perms
-, gen_subsets_of_size
-, gen_cycles
+, permutations
+, all_subsets_of_size
+, cycles
 , has_cycles
 
 -- * Partitioning
@@ -56,6 +56,7 @@ module Zora.List
 -- * Assorted functions
 , map_keep
 , maximum_with_index
+, minimum_with_index
 , length'
 , drop'
 , take'
@@ -184,56 +185,56 @@ powerset l = powerset_rec l []
 
 -- TODO: actually O(n!)?
 -- | /O(n!)/ Computes all permutations of the given list.
-gen_perms :: [a] -> [[a]]
-gen_perms l
+permutations :: [a] -> [[a]]
+permutations l
     | (length l <= 1) = [l]
     | otherwise = 
         let splice_pairs = [(l !! i, remove_at_index (toInteger i) l) | i <- [0..((length l) - 1)]]
         in
             concat [
-                [fst splice_pair : recpair | recpair <- gen_perms $ snd splice_pair]
+                [fst splice_pair : recpair | recpair <- permutations $ snd splice_pair]
                 | splice_pair <- splice_pairs
             ]
 
 -- | /O(2^k)/ Generates all subsets of the given list of size /k/.
-gen_subsets_of_size :: [a] -> Integer -> [[a]]
-gen_subsets_of_size l size = gen_subsets_of_size_rec l [] size
+all_subsets_of_size :: [a] -> Integer -> [[a]]
+all_subsets_of_size l size = all_subsets_of_size_rec l [] size
     where
-        gen_subsets_of_size_rec :: [a] -> [a] -> Integer -> [[a]]
-        gen_subsets_of_size_rec src so_far size =
+        all_subsets_of_size_rec :: [a] -> [a] -> Integer -> [[a]]
+        all_subsets_of_size_rec src so_far size =
             if size == 0
                 then [so_far]
                 else if (length src) == 0
                     then []
                     else without ++ with
             where
-                without = gen_subsets_of_size_rec (tail src) so_far size
-                with    = gen_subsets_of_size_rec (tail src) ((head src) : so_far) (size-1)
+                without = all_subsets_of_size_rec (tail src) so_far size
+                with    = all_subsets_of_size_rec (tail src) ((head src) : so_far) (size-1)
 
-{-gen_subsets_of_size_with_replacement_rec :: Integer -> [a] -> [a] -> [[a]]
-gen_subsets_of_size_with_replacement_rec size src so_far =
+{-all_subsets_of_size_with_replacement_rec :: Integer -> [a] -> [a] -> [[a]]
+all_subsets_of_size_with_replacement_rec size src so_far =
     case size == 0 of
         True  -> [so_far]
         False -> concat [map (e:) rec | e <- src]
-        where rec = gen_subsets_of_size_with_replacement_rec (size - 1)
+        where rec = all_subsets_of_size_with_replacement_rec (size - 1)
 
-gen_subsets_of_size_with_replacement :: [a] -> Integer -> [[a]]
-gen_subsets_of_size_with_replacement l size =
-    gen_subsets_of_size_with_replacement_rec size l []-}
+all_subsets_of_size_with_replacement :: [a] -> Integer -> [[a]]
+all_subsets_of_size_with_replacement l size =
+    all_subsets_of_size_with_replacement_rec size l []-}
 
 -- | /O(n)/ Generates all cycles of a given list. For example,
 -- 
--- > gen_cycles [1..3] == [[2,3,1],[3,1,2],[1,2,3]]
-gen_cycles :: (Eq a) => [a] -> [[a]]
-gen_cycles l = gen_cycles_rec l $ cycle_list l
+-- > cycles [1..3] == [[2,3,1],[3,1,2],[1,2,3]]
+cycles :: (Eq a) => [a] -> [[a]]
+cycles l = cycles_rec l $ cycle_list l
     where
         cycle_list :: [a] -> [a]
         cycle_list l = (tail l) ++ [head l]
 
-        gen_cycles_rec :: (Eq a) => [a] -> [a] -> [[a]]
-        gen_cycles_rec original_l l
+        cycles_rec :: (Eq a) => [a] -> [a] -> [[a]]
+        cycles_rec original_l l
             | l == original_l = [l]
-            | otherwise = [l] ++ (gen_cycles_rec original_l $ cycle_list l)
+            | otherwise = [l] ++ (cycles_rec original_l $ cycle_list l)
 
 -- | /O(l m)/, where /l/ is the cycle length and /m/ is the index of the start of the cycle. If the list contains no cycles, then the runtime is /O(n)/.
 has_cycles :: (Eq a) => [a] -> Bool
@@ -290,7 +291,7 @@ powerpartition l@(x:xs) =
 -- ---------------------------------------------------------------------
 -- Operations with two lists
 
--- | Given two infinite sorted lists, generates a list of elements in the first but not the second.
+-- | Given two infinite sorted lists, generates a list of elements in the first but not the second. Implementation from <http://en.literateprograms.org/Sieve_of_Eratosthenes_(Haskell)>.
 diff_infinite :: (Ord a) => [a] -> [a] -> [a]
 diff_infinite xs@(x:xt) ys@(y:yt) = 
     case compare x y of
@@ -389,7 +390,7 @@ is_palindrome s =
         else (head s == last s) && (is_palindrome $ tail . init $ s)
 
 -- TODO: do this more monadically?
--- | /O(n log(n))/ Returns whether the given list contains the any element more than once.
+-- | /O(n log(n))/ Returns whether the given list contains any element more than once.
 contains_duplicates :: forall a . (Ord a) => [a] -> Bool
 contains_duplicates l =
     if is_sorted l
@@ -408,7 +409,7 @@ contains_duplicates l =
 
 -- | /O(n)/ Maps the given function over the list while keeping the original list. For example:
 -- 
--- > λ map_keep chr [97..100] == [(97,'a'),(98,'b'),(99,'c'),(100,'d')]
+-- > map_keep chr [97..100] == [(97,'a'),(98,'b'),(99,'c'),(100,'d')]
 map_keep :: (a -> b) -> [a] -> [(a, b)]
 map_keep f l = zipWith (\a b -> (a, b)) l (map f l)
 

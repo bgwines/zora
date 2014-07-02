@@ -14,12 +14,12 @@ catchIO = Exception.catch
 
 
 version :: Version
-version = Version {versionBranch = [1,1,8], versionTags = []}
+version = Version {versionBranch = [1,1,9], versionTags = []}
 bindir, libdir, datadir, libexecdir :: FilePath
 
 bindir     = "/Users/brett/.cabal/bin"
-libdir     = "/Users/brett/.cabal/lib/Zora-1.1.8/ghc-7.6.3"
-datadir    = "/Users/brett/.cabal/share/Zora-1.1.8"
+libdir     = "/Users/brett/.cabal/lib/Zora-1.1.9/ghc-7.6.3"
+datadir    = "/Users/brett/.cabal/share/Zora-1.1.9"
 libexecdir = "/Users/brett/.cabal/libexec"
 
 getBinDir, getLibDir, getDataDir, getLibexecDir :: IO FilePath

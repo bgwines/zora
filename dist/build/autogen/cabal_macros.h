@@ -21,12 +21,40 @@
   (major1) == 0 && (major2) <  5 || \
   (major1) == 0 && (major2) == 5 && (minor) <= 0)
 
+/* package directory-1.2.0.1 */
+#define VERSION_directory "1.2.0.1"
+#define MIN_VERSION_directory(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  2 || \
+  (major1) == 1 && (major2) == 2 && (minor) <= 0)
+
+/* package fgl-5.4.2.4 */
+#define VERSION_fgl "5.4.2.4"
+#define MIN_VERSION_fgl(major1,major2,minor) (\
+  (major1) <  5 || \
+  (major1) == 5 && (major2) <  4 || \
+  (major1) == 5 && (major2) == 4 && (minor) <= 2)
+
+/* package graphviz-2999.17.0.1 */
+#define VERSION_graphviz "2999.17.0.1"
+#define MIN_VERSION_graphviz(major1,major2,minor) (\
+  (major1) <  2999 || \
+  (major1) == 2999 && (major2) <  17 || \
+  (major1) == 2999 && (major2) == 17 && (minor) <= 0)
+
 /* package random-1.0.1.1 */
 #define VERSION_random "1.0.1.1"
 #define MIN_VERSION_random(major1,major2,minor) (\
   (major1) <  1 || \
   (major1) == 1 && (major2) <  0 || \
   (major1) == 1 && (major2) == 0 && (minor) <= 1)
+
+/* package shelly-1.5.4.1 */
+#define VERSION_shelly "1.5.4.1"
+#define MIN_VERSION_shelly(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  5 || \
+  (major1) == 1 && (major2) == 5 && (minor) <= 4)
 
 /* package text-0.11.3.1 */
 #define VERSION_text "0.11.3.1"

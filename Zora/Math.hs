@@ -14,15 +14,15 @@
 module Zora.Math
 ( -- * Prime numbers and division
   primes
-, nonprimes
-, is_prime
+, composites
+, prime
 , coprime
 , euler_phi
-, factorize
+, factor
 , divisors
 
 -- * Square roots
-, irr_squares
+, irrational_squares
 , sqrt_convergents
 , continued_fraction_sqrt
 , continued_fraction_sqrt_infinite
@@ -31,7 +31,7 @@ module Zora.Math
 , is_int
 , is_power_of_int
 , int_to_double
-, get_num_digits
+, num_digits
 , tri_area
 , tri_area_double
 ) where
@@ -45,13 +45,13 @@ import Zora.List
 -- ---------------------------------------------------------------------
 -- Prime numbers and division
 
--- | A complete, monotonically increasing, infinite list of primes. Implementation based on <http://en.literateprograms.org/Sieve_of_Eratosthenes_(Haskell)>.
+-- | A complete, monotonically increasing, infinite list of primes. Implementation from <http://en.literateprograms.org/Sieve_of_Eratosthenes_(Haskell)>.
 primes :: [Integer]
-primes = [2, 3, 5] ++ (diff_infinite [7, 9 ..] nonprimes)
+primes = [2, 3, 5] ++ (diff_infinite [7, 9 ..] composites)
 
--- | A complete, monotonically increasing, infinite list of non-prime numbers.
-nonprimes :: [Integer]
-nonprimes = foldr1 f $ map g $ tail primes
+-- | A complete, monotonically increa?ing, infinite list of composite numbers.
+composites :: [Integer]
+composites = foldr1 f $ map g $ tail primes
 	where
 		f (x:xt) ys = x : (merge_infinite xt ys)
 		g p		 = [ n * p | n <- [p, p + 2 ..]]
@@ -63,24 +63,31 @@ nonprimes = foldr1 f $ map g $ tail primes
 				EQ -> x : (merge_infinite xt yt)
 				GT -> y : (merge_infinite xs yt)
 
-is_prime_rec :: Integer -> Integer -> Bool
-is_prime_rec n k
+prime_rec :: Integer -> Integer -> Bool
+prime_rec n k
 	| (n <= 1) = False
 	| (fromInteger k >= ((fromInteger n) / 2) + 1.0) = True
 	| ((n `mod` k) == 0) = False
-	| otherwise = is_prime_rec n (k+1)
+	| otherwise = prime_rec n (k+1)
 
 -- | /O(n)/ Returns whether the parameter is a prime number.
-is_prime :: Integer -> Bool
-is_prime n = is_prime_rec n 2
+prime :: Integer -> Bool
+prime n = prime_rec n 2
 
 -- | /O(min(n, m))/ Returns whether the the two parameters are <http://en.wikipedia.org/wiki/Coprime coprime>, that is, whether they share any divisors.
 coprime :: Integer -> Integer -> Bool
-coprime a b = Nothing == List.find is_common_divisor [2..(min a b)]
+coprime a b = isNothing .  List.find is_common_divisor $ [2..(min a' b')]
 	where
+		a' :: Integer
+		a' = abs a
+
+		b' :: Integer
+		b' = abs b
+
+		is_common_divisor :: Integer -> Bool
 		is_common_divisor n = (a `mod` n == 0) && (b `mod` n == 0)
 
--- | /O(1)/ `phi(p^a)` for prime `p` and nonnegative `a`.
+-- | /O(1)/ @phi(p^a)@ for prime @p@ and nonnegative @a@.
 euler_phi_for_powers_of_primes :: (Integer, Integer) -> Integer
 euler_phi_for_powers_of_primes (p, a) = p^(a-1) * (p-1)
 
@@ -90,21 +97,21 @@ euler_phi 1 = 0
 euler_phi n = product 
 	$ map
 		euler_phi_for_powers_of_primes
-		$ map format $ List.group $ factorize n
+		$ map format $ List.group $ factor n
 	where
 		format l = (head l, (toInteger . length) l) 
 
 -- TODO: don't start over in `primes`
 -- | /O(k n log(n)^-1)/, where /k/ is the number of primes dividing /n/ (double-counting for powers). /n log(n)^-1/ is an approximation for <http://en.wikipedia.org/wiki/Prime-counting_function the number of primes below a number>.
-factorize :: Integer -> [Integer]
-factorize 0 = []
-factorize 1 = []
-factorize n = p : factorize (n `div` p)
+factor :: Integer -> [Integer]
+factor 0 = []
+factor 1 = []
+factor n = p : factor (n `div` p)
 	where p = fromJust . List.find (\p -> (n `mod` p) == 0) $ primes
 
 -- | /O(4^(k n log(n)^-1))/, where /k/ is the number of primes dividing /n/ (double-counting for powers).
 divisors :: Integer -> [Integer]
-divisors = init . uniqueify . map product . powerset . factorize
+divisors = init . uniqueify . map product . powerset . factor
 
 -- ---------------------------------------------------------------------
 -- Square roots
@@ -118,7 +125,7 @@ sqrt_convergents_rec (a'', b'') (a', b') cf =
 			e = head cf
 			cf' = tail cf
 
--- | A list of fractions monotonically increasingly accurately approximating the square root of the parameter, where each fraction is represented as a pair of `(numerator, denominator)` See <http://en.wikipedia.org/wiki/Convergent_(continued_fraction)>.
+-- | A list of fractions monotonically increasingly accurately approximating the square root of the parameter, where each fraction is represented as a pair of @(numerator, denominator)@ See <http://en.wikipedia.org/wiki/Convergent_(continued_fraction)>.
 sqrt_convergents :: Integer -> [(Integer, Integer)]
 sqrt_convergents n =
 	(a0, b0) : (a1, b1) : 
@@ -134,8 +141,8 @@ sqrt_convergents n =
 		cf = continued_fraction_sqrt_infinite n
 
 -- | An infinite list of integers with irrational square roots.
-irr_squares :: [Integer]
-irr_squares = map round $ filter (not . is_int . sqrt) [1..] 
+irrational_squares :: [Integer]
+irrational_squares = map round $ filter (not . is_int . sqrt) [1..] 
 
 next_continued_fraction_sqrt :: (Integer, Integer, Integer, Integer, Integer) -> (Integer, Integer, Integer, Integer, Integer)
 next_continued_fraction_sqrt (d, m, a, a0, n) = (d', m', a', a0, n)
@@ -188,13 +195,13 @@ is_power_of_int :: Integer -> Integer -> Bool
 is_power_of_int n e = (round (fromIntegral n ** (1/(fromInteger e))))^e == n
 
 -- | /O(log_10(n))/ Calculates the number of digits in an integer.
-get_num_digits :: Integer -> Integer
-get_num_digits n = (1 + (floor $ logBase 10 (fromInteger n)))
+num_digits :: Integer -> Integer
+num_digits n = (1 + (floor $ logBase 10 (fromInteger n)))
 
--- | Returns whether a `Double` value is an integer. For example, `16.0 :: Double` is an integer, but not `16.1`.
+-- | Returns whether a @Double@ value is an integer. For example, @16.0 :: Double@ is an integer, but not @16.1@.
 is_int :: Double -> Bool
 is_int x = x == (fromInteger (round x))
 
--- | Converts a `Double` to an `Integer`.
+-- | Converts a @Double@ to an @Integer@.
 int_to_double :: Double -> Integer
 int_to_double = (toInteger . round)

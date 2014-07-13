@@ -24,7 +24,7 @@ module Zora.List
 -- * Permutations, combinations, and cycles
 , powerset
 , permutations
-, all_subsets_of_size
+, subsets_of_size
 , cycles
 , has_cycles
 
@@ -44,6 +44,8 @@ module Zora.List
 , subseq
 , take_while_keep_last
 , take_while_and_rest
+, subsequences
+, contiguous_subsequences
 
 -- * Sorting
 , is_sorted
@@ -197,30 +199,30 @@ permutations l
             ]
 
 -- | /O(2^k)/ Generates all subsets of the given list of size /k/.
-all_subsets_of_size :: [a] -> Integer -> [[a]]
-all_subsets_of_size l size = all_subsets_of_size_rec l [] size
+subsets_of_size :: [a] -> Integer -> [[a]]
+subsets_of_size l size = subsets_of_size_rec l [] size
     where
-        all_subsets_of_size_rec :: [a] -> [a] -> Integer -> [[a]]
-        all_subsets_of_size_rec src so_far size =
+        subsets_of_size_rec :: [a] -> [a] -> Integer -> [[a]]
+        subsets_of_size_rec src so_far size =
             if size == 0
                 then [so_far]
                 else if (length src) == 0
                     then []
                     else without ++ with
             where
-                without = all_subsets_of_size_rec (tail src) so_far size
-                with    = all_subsets_of_size_rec (tail src) ((head src) : so_far) (size-1)
+                without = subsets_of_size_rec (tail src) so_far size
+                with    = subsets_of_size_rec (tail src) ((head src) : so_far) (size-1)
 
-{-all_subsets_of_size_with_replacement_rec :: Integer -> [a] -> [a] -> [[a]]
-all_subsets_of_size_with_replacement_rec size src so_far =
+{-subsets_of_size_with_replacement_rec :: Integer -> [a] -> [a] -> [[a]]
+subsets_of_size_with_replacement_rec size src so_far =
     case size == 0 of
         True  -> [so_far]
         False -> concat [map (e:) rec | e <- src]
-        where rec = all_subsets_of_size_with_replacement_rec (size - 1)
+        where rec = subsets_of_size_with_replacement_rec (size - 1)
 
-all_subsets_of_size_with_replacement :: [a] -> Integer -> [[a]]
-all_subsets_of_size_with_replacement l size =
-    all_subsets_of_size_with_replacement_rec size l []-}
+subsets_of_size_with_replacement :: [a] -> Integer -> [[a]]
+subsets_of_size_with_replacement l size =
+    subsets_of_size_with_replacement_rec size l []-}
 
 -- | /O(n)/ Generates all cycles of a given list. For example,
 -- 
@@ -361,6 +363,15 @@ take_while_and_rest f l@(x:xs) = if not . f $ x
     else (x:(fst rec), snd rec)
     where
         rec = take_while_and_rest f xs
+
+-- | /(O(n^2))/ Returns all contiguous subsequences.
+contiguous_subsequences :: [a] -> [[a]]
+contiguous_subsequences = (:) [] . concatMap (tail . List.inits) . List.tails
+
+-- | /(O(2^n))/ Returns all subsequences (contiguous and noncontiguous)
+subsequences :: [a] -> [[a]]
+subsequences = map reverse . powerset
+
 
 -- ---------------------------------------------------------------------
 -- Sorting

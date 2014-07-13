@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 -- |
--- Module      : Zora.TreeGraphing
+-- Module      : Zora.Graphing.TreeGraphing
 -- Copyright   : (c) Brett Wines 2014
 --
 -- License	   : BSD-style
@@ -13,10 +13,11 @@
 -- Stability   : experimental
 -- Portability : portable
 -- 
+-- [DEPRECATED; use @DAGGraphable@ instead]
 -- A typeclass with default implementation for graphing trees with <https://hackage.haskell.org/package/graphviz Haskell GraphViz>. It is intended to be extremely straightforward to graph your data type; you only need to define three very simple functions (example implementations below).
 --
 
-module Zora.TreeGraphing
+module Zora.Graphing.TreeGraphing
 ( TreeGraphable
 , value
 , get_children

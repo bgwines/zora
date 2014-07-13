@@ -1,7 +1,7 @@
 Name:		   Zora
-Version:	   1.1.9
+Version:	   1.1.10
 Synopsis:      Graphing library wrapper + assorted useful functions 
-Description:   A library of assorted useful functions and data types and classes for working with lists, doing mathematical operations and graphing custom data types.
+Description:   A library of assorted useful functions for working with lists, doing mathematical operations and graphing custom data types.
 Category:      Unclassified
 Cabal-Version: >= 1.6
 License:	   BSD3
@@ -32,4 +32,5 @@ Library
     Zora.List
     Zora.Math
     Zora.Types
-    Zora.TreeGraphing
+    Zora.Graphing.TreeGraphing
+    Zora.Graphing.DAGGraphing

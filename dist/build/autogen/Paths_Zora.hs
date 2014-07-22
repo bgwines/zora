@@ -1,7 +1,7 @@
 module Paths_Zora (
     version,
     getBinDir, getLibDir, getDataDir, getLibexecDir,
-    getDataFileName
+    getDataFileName, getSysconfDir
   ) where
 
 import qualified Control.Exception as Exception
@@ -14,19 +14,21 @@ catchIO = Exception.catch
 
 
 version :: Version
-version = Version {versionBranch = [1,1,10], versionTags = []}
-bindir, libdir, datadir, libexecdir :: FilePath
+version = Version {versionBranch = [1,1,10,2], versionTags = []}
+bindir, libdir, datadir, libexecdir, sysconfdir :: FilePath
 
 bindir     = "/Users/brett/.cabal/bin"
-libdir     = "/Users/brett/.cabal/lib/Zora-1.1.10/ghc-7.6.3"
-datadir    = "/Users/brett/.cabal/share/Zora-1.1.10"
+libdir     = "/Users/brett/.cabal/lib/x86_64-osx-ghc-7.6.3/Zora-1.1.10.2"
+datadir    = "/Users/brett/.cabal/share/x86_64-osx-ghc-7.6.3/Zora-1.1.10.2"
 libexecdir = "/Users/brett/.cabal/libexec"
+sysconfdir = "/Users/brett/.cabal/etc"
 
-getBinDir, getLibDir, getDataDir, getLibexecDir :: IO FilePath
+getBinDir, getLibDir, getDataDir, getLibexecDir, getSysconfDir :: IO FilePath
 getBinDir = catchIO (getEnv "Zora_bindir") (\_ -> return bindir)
 getLibDir = catchIO (getEnv "Zora_libdir") (\_ -> return libdir)
 getDataDir = catchIO (getEnv "Zora_datadir") (\_ -> return datadir)
 getLibexecDir = catchIO (getEnv "Zora_libexecdir") (\_ -> return libexecdir)
+getSysconfDir = catchIO (getEnv "Zora_sysconfdir") (\_ -> return sysconfdir)
 
 getDataFileName :: FilePath -> IO FilePath
 getDataFileName name = do

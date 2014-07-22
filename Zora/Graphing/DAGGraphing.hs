@@ -13,22 +13,19 @@
 -- Stability   : experimental
 -- Portability : portable
 -- 
--- A typeclass with default implementation for graphing trees with <https://hackage.haskell.org/package/graphviz Haskell GraphViz>. It is intended to be extremely straightforward to graph your data type; you only need to define three very simple functions (example implementations below).
+-- A typeclass with default implementation for graphing trees with <https://hackage.haskell.org/package/graphviz Haskell GraphViz>. It is intended to be extremely straightforward to graph your data type; you only need to define one simple function (example implementation below).
 --
 
 module Zora.Graphing.DAGGraphing
 ( DAGGraphable
 , graph
 , expand
-, zoldMap
 ) where
 
 import Shelly
 import System.Directory (removeFile, getDirectoryContents)
 import Control.Exception
 import System.IO.Error hiding (catch)
-
-import System.IO.Unsafe
 
 import Data.Maybe
 import Data.Tuple
@@ -63,7 +60,7 @@ class DAGGraphable g where
 	-- > expand (Node x l r) = Just (x, [("L child", l), ("R child", r)])
 	expand :: g -> Maybe (Maybe String, [(Maybe String, g)])
 
--- | Returns whether a node is empty. Sometimes, when declaringlgebraic data types, it is desirable to have an \"Empty\" show_node constructor. If your data type does not have an \"Empty\" show_node constructor, just always return @False@.
+-- | Returns whether a node is empty. Sometimes, when declaring algebraic data types, it is desirable to have an \"Empty\" show_node constructor. If your data type does not have an \"Empty\" show_node constructor, just always return @False@.
 -- 
 -- > is_empty Empty = True
 -- > is_empty _ = False
@@ -94,12 +91,6 @@ get_children node =
 		then error "DAGGraphable implementation error. We shouldn't be calling this function for an empty node."
 		else snd . fromJust . expand $ node
 
--- | A default implementation of @zoldMap@ -- being instance of @DAGGraphable@ is enough to make your data type an instance of @Zoldable@ (in @Zora.Types@). You shouldn't need to override this implementation; just define
---
--- > instance Zoldable Tree where
--- > 	zoldMap :: (Monoid m) => (Tree a -> m) -> Tree a -> m
--- > 	zoldMap = G.zoldMap
---
 zoldMap :: (Monoid m, DAGGraphable g) => (g -> m) -> g -> m
 zoldMap f node =
 	if is_empty node

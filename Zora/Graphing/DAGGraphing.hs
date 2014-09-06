@@ -56,8 +56,8 @@ class DAGGraphable g where
 	-- | Expands a node into its show_node and children. For example,
 	-- 
 	-- > expand (Empty) = Nothing
-	-- > expand (Leaf x) = Just (x, [])
-	-- > expand (Node x l r) = Just (x, [("L child", l), ("R child", r)])
+	-- > expand (Leaf x) = Just (show x, [])
+	-- > expand (Node x l r) = Just (show x, [("L child", l), ("R child", r)])
 	expand :: g -> Maybe (Maybe String, [(Maybe String, g)])
 
 -- | Returns whether a node is empty. Sometimes, when declaring algebraic data types, it is desirable to have an \"Empty\" show_node constructor. If your data type does not have an \"Empty\" show_node constructor, just always return @False@.

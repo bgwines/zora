@@ -1,10 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
--- Module      : Zora.List
+-- Module   : Zora.List
 -- Copyright   : (c) Brett Wines 2014
 --
--- License     : BSD-style
+-- License   : BSD-style
 --
 -- Maintainer  : bgwines@cs.stanford.edu
 -- Stability   : experimental
@@ -15,8 +15,13 @@
 
 module Zora.List
 (
+-- * Partitioning
+  partition_with_block_size
+, partition_into_k
+, powerpartition
+
 -- * List transformations
-  uniqueify
+, uniqueify
 , pairify
 , decyclify
 , shuffle
@@ -25,13 +30,9 @@ module Zora.List
 , powerset
 , permutations
 , subsets_of_size
+, subsets_of_size_with_replacement
 , cycles
 , has_cycles
-
--- * Partitioning
-, partition_with_block_size
-, partition_into_k
-, powerpartition
 
 -- * Operations with two lists
 , diff_infinite
@@ -44,6 +45,7 @@ module Zora.List
 , subseq
 , take_while_keep_last
 , take_while_and_rest
+, find_and_rest
 , subsequences
 , contiguous_subsequences
 
@@ -56,14 +58,34 @@ module Zora.List
 , contains_duplicates
 
 -- * Assorted functions
+, bsearch
+, bsearch_1st_geq
+, elem_counts
+, running_bests
+, running_bests_by
+, (<$*>)
+, ($$)
+, interleave
+, count
 , map_keep
 , maximum_with_index
 , minimum_with_index
+, minima_by
 , length'
 , drop'
 , take'
 , cons
 , snoc
+
+-- * Tuples
+, map_fst
+, map_snd
+, map_pair
+, fst3
+, snd3
+, trd3
+, pair_op
+, triple_op
 ) where
 
 import qualified Data.List as List
@@ -72,8 +94,58 @@ import qualified Data.Set as Set
 
 import System.Random
 
+import Control.Applicative
+
 import Data.Monoid
 import Data.Maybe
+
+-- ---------------------------------------------------------------------
+-- Partitioning
+
+-- | /O(n)/ Partitions the given list into blocks of the specified length. Truncation behaves as follows:
+-- 
+-- > partition_with_block_size 3 [1..10] == [[1,2,3],[4,5,6],[7,8,9],[10]]
+partition_with_block_size :: Int -> [a] -> [[a]]
+partition_with_block_size len l =
+    if (length l) <= len
+        then [l]
+        else (take len l) : (partition_with_block_size len (drop len l))
+
+-- | /O(n)/ Partitions the given list into /k/ blocks. Truncation behavior is best described by example:
+-- 
+-- > partition_into_k  3 [1..9]  == [[1,2,3],[4,5,6],[7,8,9]]
+-- > partition_into_k  3 [1..10] == [[1,2,3,4],[5,6,7,8],[9,10]]
+-- > partition_into_k  3 [1..11] == [[1,2,3,4],[5,6,7,8],[9,10,11]]
+-- > partition_into_k  3 [1..12] == [[1,2,3,4],[5,6,7,8],[9,10,11,12]]
+-- > partition_into_k  3 [1..13] == [[1,2,3,4,5],[6,7,8,9,10],[11,12,13]]
+partition_into_k :: Int -> [a] -> [[a]]
+partition_into_k k arr = partition_with_block_size block_size arr
+    where
+        block_size :: Int
+        block_size = if (((length arr) `mod` k) == 0)
+            then (length arr) `div` k
+            else (length arr) `div` k + 1
+
+-- | /O(B(n))/, where /B(n)/ is the /n/^th <http://en.wikipedia.org/wiki/Bell_number Bell number>. Computes all partitions of the given list. For example,
+-- 
+-- > powerpartition [1..3] == [[[1],[2],[3]], [[1,2],[3]], [[2],[1,3]], [[1],[2,3]], [[1,2,3]]]
+powerpartition :: [a] -> [[[a]]]
+powerpartition [] = []
+powerpartition l@(x:xs) =
+    if length l == 1
+        then [[[x]]]
+        else concatMap (get_next_partitions x) . powerpartition $ xs
+        where
+            get_next_partitions :: a -> [[a]] -> [[[a]]]
+            get_next_partitions e l = ([e] : l) : (map f indices)
+                where
+                    f i = (a i) ++ (b i) ++ (c i)
+                    
+                    a i = ((take' i) l)
+                    b i = [e : (l !! (fromInteger i))]
+                    c i = (drop' (i+1) l)
+
+                    indices = [0..((length' l) - 1)]
 
 -- ---------------------------------------------------------------------
 -- List transformations
@@ -91,6 +163,8 @@ pairify l@(a:b:l') = (a, b) : pairify l'
 pairify l = []
 
 -- | /O(l m)/, where /l/ is the cycle length and /m/ is the index of the start of the cycle. If the list contains no cycles, then the runtime is /O(n)/.
+--
+-- NOTE: this function will only find cycles in a list can be the output of an iterated function -- that is, no element may be succeeded by two separate elements (e.g. [2,3,2,4]).
 decyclify :: (Eq a) => [a] -> [a]
 decyclify = fromJust . List.find (not . has_cycles) . iterate decyclify_once
 
@@ -100,11 +174,11 @@ decyclify_once l =
         then l
         else take' (lambda' + mu'') l
     where
-        i       = alg1 (tail l) (tail . tail $ l)
-        i'      = fromJust i
+        i    = alg1 (tail l) (tail . tail $ l)
+        i'  = fromJust i
 
-        mu      = if (i  == Nothing) then Nothing else alg2 l (drop' i' l)
-        mu'     = fromInteger . fromJust $ mu
+        mu  = if (i  == Nothing) then Nothing else alg2 l (drop' i' l)
+        mu'  = fromInteger . fromJust $ mu
         mu''    = fromJust mu
 
         lambda  = if (mu == Nothing) then Nothing else alg3 (drop (mu' + 1) l) (l !! mu')
@@ -183,7 +257,7 @@ powerset l = powerset_rec l []
         powerset_rec [] so_far = [so_far]
         powerset_rec src so_far = without ++ with
             where without = powerset_rec (tail src) (so_far)
-                  with    = powerset_rec (tail src) ((head src) : so_far)
+                  with  = powerset_rec (tail src) ((head src) : so_far)
 
 -- TODO: actually O(n!)?
 -- | /O(n!)/ Computes all permutations of the given list.
@@ -213,16 +287,20 @@ subsets_of_size l size = subsets_of_size_rec l [] size
                 without = subsets_of_size_rec (tail src) so_far size
                 with    = subsets_of_size_rec (tail src) ((head src) : so_far) (size-1)
 
-{-subsets_of_size_with_replacement_rec :: Integer -> [a] -> [a] -> [[a]]
-subsets_of_size_with_replacement_rec size src so_far =
-    case size == 0 of
-        True  -> [so_far]
-        False -> concat [map (e:) rec | e <- src]
-        where rec = subsets_of_size_with_replacement_rec (size - 1)
+-- | /O(n^m)/ Computes all sets comprised of elements in the given list, where the elements may be used multiple times, where `n` is the size of the given list and `m` is the size of the sets to generate. For example,
+--
+--   > subsets_of_size_with_replacement 3 [1,2] == [[1,1,1],[2,1,1],[1,2,1],[2,2,1],[1,1,2],[2,1,2],[1,2,2],[2,2,2]]
 
-subsets_of_size_with_replacement :: [a] -> Integer -> [[a]]
-subsets_of_size_with_replacement l size =
-    subsets_of_size_with_replacement_rec size l []-}
+subsets_of_size_with_replacement :: Integer -> [a] -> [[a]]
+subsets_of_size_with_replacement n src = subsets_of_size_with_replacement' n src []
+    where
+        subsets_of_size_with_replacement' :: forall a. Integer -> [a] -> [a] -> [[a]]
+        subsets_of_size_with_replacement' 0 src so_far = [so_far]
+        subsets_of_size_with_replacement' n src so_far
+            = concatMap (subsets_of_size_with_replacement' (n-1) src) $ nexts
+            where
+                nexts :: [[a]]
+                nexts = map (: so_far) src
 
 -- | /O(n)/ Generates all cycles of a given list. For example,
 -- 
@@ -241,54 +319,6 @@ cycles l = cycles_rec l $ cycle_list l
 -- | /O(l m)/, where /l/ is the cycle length and /m/ is the index of the start of the cycle. If the list contains no cycles, then the runtime is /O(n)/.
 has_cycles :: (Eq a) => [a] -> Bool
 has_cycles l = (decyclify_once l) /= l
-
--- ---------------------------------------------------------------------
--- Partitioning
-
--- | /O(n)/ Partitions the given list into blocks of the specified length. Truncation behaves as follows:
--- 
--- > partition_with_block_size 3 [1..10] == [[1,2,3],[4,5,6],[7,8,9],[10]]
-partition_with_block_size :: Int -> [a] -> [[a]]
-partition_with_block_size len l =
-    if (length l) <= len
-        then [l]
-        else (take len l) : (partition_with_block_size len (drop len l))
-
--- | /O(n)/ Partitions the given list into /k/ blocks. Truncation behavior is best described by example:
--- 
--- > partition_into_k  3 [1..9]  == [[1,2,3],[4,5,6],[7,8,9]]
--- > partition_into_k  3 [1..10] == [[1,2,3,4],[5,6,7,8],[9,10]]
--- > partition_into_k  3 [1..11] == [[1,2,3,4],[5,6,7,8],[9,10,11]]
--- > partition_into_k  3 [1..12] == [[1,2,3,4],[5,6,7,8],[9,10,11,12]]
--- > partition_into_k  3 [1..13] == [[1,2,3,4,5],[6,7,8,9,10],[11,12,13]]
-partition_into_k :: Int -> [a] -> [[a]]
-partition_into_k k arr = partition_with_block_size block_size arr
-    where
-        block_size :: Int
-        block_size = if (((length arr) `mod` k) == 0)
-            then (length arr) `div` k
-            else (length arr) `div` k + 1
-
--- | /O(B(n))/, where /B(n)/ is the /n/^th <http://en.wikipedia.org/wiki/Bell_number Bell number>. Computes all partitions of the given list. For example,
--- 
--- > powerpartition [1..3] == [[[1],[2],[3]], [[1,2],[3]], [[2],[1,3]], [[1],[2,3]], [[1,2,3]]]
-powerpartition :: [a] -> [[[a]]]
-powerpartition [] = []
-powerpartition l@(x:xs) =
-    if length l == 1
-        then [[[x]]]
-        else concatMap (get_next_partitions x) . powerpartition $ xs
-        where
-            get_next_partitions :: a -> [[a]] -> [[[a]]]
-            get_next_partitions e l = ([e] : l) : (map f indices)
-                where
-                    f i = (a i) ++ (b i) ++ (c i)
-                    
-                    a i = ((take' i) l)
-                    b i = [e : (l !! (fromInteger i))]
-                    c i = (drop' (i+1) l)
-
-                    indices = [0..((length' l) - 1)]
 
 -- ---------------------------------------------------------------------
 -- Operations with two lists
@@ -355,7 +385,7 @@ take_while_keep_last f (x:xs) =
 
 -- | /(O(n))/ Returns a pair where the first element is identical to what `takeWhile` returns and the second element is the rest of the list
 -- 
--- > take_while_keep_last (<3) [1..] == [1,2,3]
+-- > take_while_and_rest (<3) [1..10] == ([1,2],[3,4,5,6,7,8,9,10])
 take_while_and_rest :: (a -> Bool) -> [a] -> ([a], [a])
 take_while_and_rest f [] = ([], [])
 take_while_and_rest f l@(x:xs) = if not . f $ x
@@ -364,6 +394,15 @@ take_while_and_rest f l@(x:xs) = if not . f $ x
     where
         rec = take_while_and_rest f xs
 
+-- | /O(n)/ Like @Data.List.Find@, but returns a Maybe 2-tuple, instead, where the second element of the pair is the elements in the list after the first element of the pair.
+--
+-- > (find_and_rest ((==) 3) [1..10]) == Just (3, [4..10])
+find_and_rest :: (a -> Bool) -> [a] -> Maybe (a, [a])
+find_and_rest _ [] = Nothing
+find_and_rest f (x:xs) = if f x
+    then Just (x, xs)
+    else find_and_rest f xs
+
 -- | /(O(n^2))/ Returns all contiguous subsequences.
 contiguous_subsequences :: [a] -> [[a]]
 contiguous_subsequences = (:) [] . concatMap (tail . List.inits) . List.tails
@@ -371,7 +410,6 @@ contiguous_subsequences = (:) [] . concatMap (tail . List.inits) . List.tails
 -- | /(O(2^n))/ Returns all subsequences (contiguous and noncontiguous)
 subsequences :: [a] -> [[a]]
 subsequences = map reverse . powerset
-
 
 -- ---------------------------------------------------------------------
 -- Sorting
@@ -387,18 +425,14 @@ mergesort l =
         then l
         else merge (mergesort a) (mergesort b)
         where
-            (a, b) = splitAt (floor ((fromIntegral $ length l) / 2)) l
+            (a, b) = splitAt (((fromIntegral $ length l) `div` 2)) l
 
 -- ---------------------------------------------------------------------
 -- Predicates
 
--- TODO: O(n log(n))
--- | /O(n^2)/ Returns whether the given list is a palindrome.
+-- | /O(n)/ Returns whether the given list is a palindrome.
 is_palindrome :: (Eq e) => [e] -> Bool
-is_palindrome s =
-    if length s <= 1
-        then True
-        else (head s == last s) && (is_palindrome $ tail . init $ s)
+is_palindrome l = l == (reverse l)
 
 -- TODO: do this more monadically?
 -- | /O(n log(n))/ Returns whether the given list contains any element more than once.
@@ -417,6 +451,121 @@ contains_duplicates l =
 
 -- ---------------------------------------------------------------------
 -- Assorted functions
+
+-- | /O(nlog(n))/ Counts the number of time each element appears in the given list. For example:
+--
+--  > elem_counts [1,2,1,4] == [(1,2),(2,1),(4,1)]
+elem_counts :: (Ord a) => [a] -> [(a, Integer)]
+elem_counts
+    = map (\l -> (head l, length' l))
+    . List.group
+    . List.sort
+
+-- | Shorthand for applicative functors:
+--
+--  > f <$*> l = f <$> l <*> l
+(<$*>) :: Applicative f => (a -> a -> b) -> f a -> f b
+f <$*> l = f <$> l <*> l
+
+-- | /O(f log k)/, where k is the returnvalue, and f is the runtime of the input function on the lowest power of 2 above the returnvalue.
+bsearch :: (Integer -> Ordering) -> Maybe Integer
+bsearch f = bsearch' f lb ub
+    where
+        lb :: Integer
+        lb
+            = last
+            . takeWhile (\n -> (f n) == LT)
+            . map (\e -> 2^e)
+            $ [1..]
+
+        ub :: Integer
+        ub = lb * 2
+
+        bsearch' :: (Integer -> Ordering) -> Integer -> Integer -> Maybe Integer
+        bsearch' f lb ub
+            | (lb - ub <= 10)
+                = List.find ((==) EQ . f)
+                $ [lb..ub]
+            | otherwise =
+                case f curr of
+                    LT -> bsearch' f curr ub
+                    EQ -> Just curr
+                    GT -> bsearch' f lb curr
+                where
+                    curr :: Integer
+                    curr = (lb + ub) `div` 2
+
+-- | /O(f log k)/, where k is the returnvalue, and f is the runtime of the input function on the lowest power of 2 above the returnvalue.
+bsearch_1st_geq :: (Integer -> Ordering) -> Maybe Integer
+bsearch_1st_geq f = bsearch_1st_geq' f lb ub
+    where
+        lb :: Integer
+        lb
+            = last
+            . takeWhile (\n -> (f n) == LT)
+            . map (\e -> 2^e)
+            $ [1..]
+
+        ub :: Integer
+        ub = lb * 2
+
+        bsearch_1st_geq' :: (Integer -> Ordering) -> Integer -> Integer -> Maybe Integer
+        bsearch_1st_geq' f lb ub
+            | (lb - ub <= 10)
+                = List.find (\x -> ((==) EQ . f $ x) || ((==) GT . f $ x))
+                $ [lb..ub]
+            | otherwise =
+                case f curr of
+                    LT -> bsearch_1st_geq' f curr ub
+                    EQ -> bsearch_1st_geq' f lb curr
+                    GT -> bsearch_1st_geq' f lb curr
+                where
+                    curr :: Integer
+                    curr = (lb + ub) `div` 2
+
+-- | /O(n)/ Returns the noncontiguous sublist of elements greater than all previous elements. For example:
+--
+--   > running_bests [1,3,2,4,6,5] == [1,3,4,6]
+running_bests :: forall a. (Ord a) => [a] -> [a]
+running_bests = running_bests_by compare
+
+-- | /O(n)/ Returns the noncontiguous sublist of elements greater than all previous elements, where "greater" is determined by the provided comparison function. For example:
+--
+--   > running_bests_by (Data.Ord.comparing length) [[1],[3,3,3],[2,2]] == [[1],[3,3,3]]
+running_bests_by :: forall a. (Ord a) => (a -> a -> Ordering) -> [a] -> [a]
+running_bests_by cmp [] = []
+running_bests_by cmp (x:xs) = (:) x $ running_bests_by' xs x
+    where
+        running_bests_by' :: (Ord a) => [a] -> a -> [a]
+        running_bests_by' [] _ = []
+        running_bests_by' (x:xs) best_so_far = 
+            case best_so_far `cmp` x of
+                LT -> x : (running_bests_by' xs x)
+                EQ -> x : (running_bests_by' xs x)
+                GT ->      running_bests_by' xs best_so_far
+
+-- | /O(min(n, m))/ Interleaves elements from the two given lists of respective lengths `n` and `m` in an alternating fashion. For example:
+--
+--  > interleave [1,3,5,7] [2,4,6,8] == [1,2,3,4,5,6,7,8]
+--
+--  > interleave [1,3,5,7] [2,4,6] == [1,2,3,4,5,6,7]
+--
+--  > interleave [1,3,5] [2,4,6,8] == [1,2,3,4,5,6,8]
+interleave :: [a] -> [a] -> [a]
+interleave [] bs = bs
+interleave as [] = as
+interleave (a:as) (b:bs) = a : b : (interleave as bs)
+
+-- /O(nf)/ Filters a list of length `n` leaving elemnts the indices of which satisfy the given predicate function, which has runtime `f`.
+passing_index_elems :: (Int -> Bool) -> [a] -> [a]
+passing_index_elems f
+    = map snd
+    . filter (f . fst)
+    . zip [0..]
+
+-- | /O(n)/ counts the number of elements in a list that satisfy a given predicate function.
+count :: (a -> Bool) -> [a] -> Integer
+count f = toInteger . length . filter f
 
 -- | /O(n)/ Maps the given function over the list while keeping the original list. For example:
 -- 
@@ -440,7 +589,9 @@ take' = take . fromInteger
 cons :: a -> [a] -> [a]
 cons = (:)
 
--- | List post-pending.
+-- | List appending.
+--
+--   > snoc 4 [1,2,3] == [1,2,3,4]
 snoc :: a -> [a] -> [a]
 snoc e l = l ++ [e]
 
@@ -453,3 +604,53 @@ maximum_with_index xs =
 minimum_with_index :: (Ord a) => [a] -> (a, Integer)
 minimum_with_index xs =
     List.minimumBy (Ord.comparing fst) (zip xs [0..])
+
+-- | /O(n)/ Finds all minima of the given list by the given comparator function. For example,
+--   > minima_by (Data.Ord.comparing length) [[1,2], [1], [3,3,3], [2]]
+--   [[1], [2]]
+minima_by :: (a -> a -> Ordering) -> [a] -> [a]
+minima_by cmp [] = []
+minima_by cmp (x:xs) = minima_by' cmp xs [x]
+    where
+        minima_by' :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
+        minima_by' _ [] so_far = so_far
+        minima_by' cmp (x:xs) so_far =
+            case x `cmp` (head so_far) of
+                LT -> minima_by' cmp xs [x]
+                EQ -> minima_by' cmp xs (x : so_far)
+                GT -> minima_by' cmp xs so_far
+
+-- ---------------------------------------------------------------------
+-- Tuples
+
+-- | Applies the given function to the first element of the tuple.
+map_fst :: (a -> c) -> (a, b) -> (c, b)
+map_fst = flip map_pair $ id
+
+-- | Applies the given function to the second element of the tuple.
+map_snd :: (b -> c) -> (a, b) -> (a, c)
+map_snd = map_pair id
+
+-- | Applies the given two functions to the respective first and second elements of the tuple.
+map_pair :: (a -> c) -> (b -> d) -> (a, b) -> (c, d)
+map_pair f g (a, b) = (f a, g b)
+
+-- | Extracts the first element of a 3-tuple.
+fst3 :: (a, b, c) -> a
+fst3 (a, _, _) = a
+
+-- | Extracts the second element of a 3-tuple.
+snd3 :: (a, b, c) -> b
+snd3 (_, b, _) = b
+
+-- | Extracts the third element of a 3-tuple.
+trd3 :: (a, b, c) -> c
+trd3 (_, _, c) = c
+
+-- | Applies the given binary function to both elements of the given tuple.
+pair_op :: (a -> b -> c) -> (a, b) -> c
+pair_op op (a, b) = op a b
+
+-- | Applies the given ternary function to all three elements of the given tuple.
+triple_op :: (a -> b -> c -> d) -> (a, b, c) -> d
+triple_op op (a, b, c) = op a b c

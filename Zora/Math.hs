@@ -16,11 +16,15 @@ module Zora.Math
   primes
 , composites
 , prime
+, prime_miller_rabin
 , coprime
 , euler_phi
 , factor
+, factor_number_is_perfect_square
 , divisors
+, divisors_number_is_perfect_square
 , num_divisors
+, num_divisors_of_n_squared_leq_n
 
 -- * Square roots
 , irrational_squares
@@ -28,6 +32,14 @@ module Zora.Math
 , continued_fraction_sqrt
 , continued_fraction_sqrt_infinite
 , square
+
+-- * Modular arithmetic
+, add_mod
+, sub_mod
+, mul_mod
+, div_mod
+, pow_mod
+, multiplicative_inverse
 
 -- * Assorted functions
 , fibs
@@ -38,6 +50,7 @@ module Zora.Math
 , num_digits
 , tri_area
 , tri_area_double
+, solve_linear_system
 ) where
 
 import qualified Zora.List as ZList
@@ -47,6 +60,8 @@ import qualified Data.List as List
 import Data.Maybe
 
 import Control.Applicative
+
+import System.Random
 
 -- ---------------------------------------------------------------------
 -- Prime numbers and division
@@ -69,16 +84,53 @@ composites = foldr1 f $ map g $ tail primes
 				EQ -> x : (merge_infinite xt yt)
 				GT -> y : (merge_infinite xs yt)
 
-prime_rec :: Integer -> Integer -> Bool
-prime_rec n k
-	| (n <= 1) = False
-	| (fromInteger k >= ((fromInteger n) / 2) + 1.0) = True
-	| ((n `mod` k) == 0) = False
-	| otherwise = prime_rec n (k+1)
+random_integers :: (Integer, Integer) -> Integer -> [Integer]
+random_integers range seed = randomRs range . mkStdGen $ fromInteger seed
 
--- | /O(n)/ Returns whether the parameter is a prime number.
+-- | /O(log^3 n)/ Uses the <http://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Example Miller-Rabin primality test> to determine primality. Always correctly identifies primes, but may misidentify some composites as primes (for most practical input values, this will not happen (~3 below 10^9? 0 below 10^7.).).
+prime_miller_rabin :: Integer -> Bool
+prime_miller_rabin n =
+	if small_prime_divides || (n == 1)
+		then False
+		else (n `elem` (take 10 primes)) || all (prime_miller_rabin' n) as
+		where
+			as :: [Integer]
+			as = take 30 $ random_integers (2, n - 2) 2436572
+
+			small_prime_divides :: Bool
+			small_prime_divides
+				= any (\p -> (n `mod` p) == 0)
+				. filter ((/=) n)
+				$ take 7 primes
+
+prime_miller_rabin' :: Integer -> Integer -> Bool
+prime_miller_rabin' n a =
+	if (x == 1) || (x == n - 1)
+		then True
+		else if powers' == []
+			then False
+			else head powers' == (n-1)
+	where
+		powers' = filter (\k -> k == 1 || k == (n - 1)) powers
+
+		powers :: [Integer]
+		powers
+			= map (\e -> (pow_mod n x e))
+			. scanl1 (mul_mod n)
+			$ replicate ((fromIntegral s) - 1) 2
+
+		x :: Integer
+		x = pow_mod n a d
+
+		s :: Integer
+		s = last . takeWhile (\e -> ((n - 1) `mod` (2^e)) == 0) $ [1..]
+
+		d :: Integer
+		d = (n - 1) `div` (2^s)
+
+-- | /O(k n log(n)^-1)/, where /k/ is the number of primes dividing /n/ (double-counting for powers). /n log(n)^-1/ is an approximation for <http://en.wikipedia.org/wiki/Prime-counting_function the number of primes below a number>. Returns whether the parameter is a prime number.
 prime :: Integer -> Bool
-prime n = prime_rec n 2
+prime n = (factor n) == [n]
 
 -- | /O(min(n, m))/ Returns whether the the two parameters are <http://en.wikipedia.org/wiki/Coprime coprime>, that is, whether they share any divisors.
 coprime :: Integer -> Integer -> Bool
@@ -107,9 +159,9 @@ euler_phi n = product
 	where
 		format l = (head l, (toInteger . length) l) 
 
-
+-- | /O(k n log(n)^-1)/, where /k/ is the number of primes dividing /n/ (double-counting for powers). /n log(n)^-1/ is an approximation for <http://en.wikipedia.org/wiki/Prime-counting_function the number of primes below a number>.
 factor_number_is_perfect_square :: Integer -> [Integer]
-factor_number_is_perfect_square n = $
+factor_number_is_perfect_square n = ZList.interleave ZList.$$ sqrt_factorization
 	where
 		sqrt_factorization :: [Integer]
 		sqrt_factorization = factor (sqrt_perfect_square n)
@@ -140,17 +192,31 @@ num_divisors
 	. factor
 
 -- | /O(k n log(n)^-1)/, where /k/ is the number of primes dividing /n/ (double-counting for powers). /n log(n)^-1/ is an approximation for <http://en.wikipedia.org/wiki/Prime-counting_function the number of primes below a number>. Essentially, linear in the time it takes to factor the number.
+num_divisors_of_n_squared_leq_n :: Integer -> Integer
+num_divisors_of_n_squared_leq_n
+	= succ
+	. (\m -> m `div` 2)
+	. product
+	. map (succ . ((*) 2) . snd) -- succ because p_i^0 is a valid choice
+	. ZList.elem_counts
+	. factor
+
+-- | /O(k n log(n)^-1)/, where /k/ is the number of primes dividing /n/ (double-counting for powers). /n log(n)^-1/ is an approximation for <http://en.wikipedia.org/wiki/Prime-counting_function the number of primes below a number>. Essentially, linear in the time it takes to factor the number.
+divisors_number_is_perfect_square :: Integer -> [Integer]
+divisors_number_is_perfect_square = factors_to_divisors . ZList.elem_counts . factor_number_is_perfect_square
+
+-- | /O(k n log(n)^-1)/, where /k/ is the number of primes dividing /n/ (double-counting for powers). /n log(n)^-1/ is an approximation for <http://en.wikipedia.org/wiki/Prime-counting_function the number of primes below a number>. Essentially, linear in the time it takes to factor the number.
 divisors :: Integer -> [Integer]
 divisors = factors_to_divisors . ZList.elem_counts . factor
-	where
-		factors_to_divisors :: [(Integer, Integer)] -> [Integer]
-		factors_to_divisors
-			= init
-			. List.sort
-			. map product
-			. map (map (\(p, a) -> p^a))
-			. factors_to_divisors_rec
 
+factors_to_divisors :: [(Integer, Integer)] -> [Integer]
+factors_to_divisors
+	= (\l -> if l == [] then [] else init l)
+	. List.sort
+	. map product
+	. map (map (\(p, a) -> p^a))
+	. factors_to_divisors_rec
+	where
 		factors_to_divisors_rec :: [(Integer, Integer)] -> [[(Integer, Integer)]]
 		factors_to_divisors_rec = map (filter ((/=) 0 . snd)) . factors_to_divisors_rec'
 
@@ -235,6 +301,97 @@ sqrt_perfect_square = toInteger . ceiling . sqrt . fromInteger
 -- ---------------------------------------------------------------------
 -- Assorted functions
 
+pow :: Integer -> Integer -> (Integer -> Integer -> Integer) -> (Integer -> Integer) -> Integer
+pow b 0 _ _ = 1
+pow b 1 _ _ = b
+pow b_original e_original mul sq = pow' b_original e_original 1
+	where
+		pow' :: Integer -> Integer -> Integer -> Integer
+		pow' b e curr_e
+			= if curr_e == e
+				then b
+				else if (curr_e * 2) <= e
+					then pow' (sq b) e (curr_e * 2)
+					else b `mul` (pow' b_original (e - curr_e) 1)
+
+-- | /O(log_2 e)/ Raises base /b/ (2nd param) to exponent /e/ (3rd param) mod /m/ (1st param). E.g.:
+--
+--
+--     > pow_mod 13 2 4
+--
+--     > 3 
+pow_mod :: Integer -> Integer -> Integer -> Integer
+pow_mod m b e = pow b e (mul_mod m) (square_mod m)
+	where
+		square_mod :: Integer -> Integer -> Integer
+		square_mod m a = (a * a) `mod` m
+
+-- | Multiplies the second parameter by the third, mod the first. E.g.:
+--
+--
+--     > mul_mod 5 2 4
+--
+--     > 3
+mul_mod :: Integer -> Integer -> Integer -> Integer
+mul_mod m a b = (a * b) `mod` m
+
+-- | Adds the second parameter by the third, mod the first. E.g.:
+--
+--
+--     > add_mod 5 3 4
+--
+--     > 2
+add_mod :: Integer -> Integer -> Integer -> Integer
+add_mod m a b = (a + b) `mod` m
+
+-- | Subtracts the third parameter from the second, mod the first. E.g.:
+--
+--
+--     > sub_mod 5 16 7
+--
+--     > 4
+sub_mod :: Integer -> Integer -> Integer -> Integer
+sub_mod m a b = (a - b) `mod` m
+
+-- | Divides the second parameter by the third, mod the first. More explicitly, it multiplies the second by the multiplicative inverse of the third, mod the first. E.g.:
+--
+--
+--     > div_mod 5 16 7
+--
+--     > Just 3
+--
+-- Note that only elements coprime to the modulus will have inverses; in cases that do not match this criterion, we return Nothing.
+div_mod :: Integer -> Integer -> Integer -> Maybe Integer
+div_mod m a b =
+	if isJust b'
+		then Just (mul_mod m a (fromJust b'))
+		else Nothing
+		where
+			b' :: Maybe Integer
+			b' = multiplicative_inverse m b
+
+-- | Like @div_mod@, but with the assurance that the modulus is prime (i.e. denominator will have an inverse). Thus, the returnvalue doesn't need to be wrapped in a @Maybe@.
+div_mod_prime :: Integer -> Integer -> Integer -> Integer
+div_mod_prime m a b = fromJust (div_mod m a b)
+
+-- | /O(log m)/ Computes the multiplicative inverse of the second parameter, in the group /Z_m/, where /m/ is the first parameter. E.g.:
+--
+--
+--     > multiplicative_inverse 13 6
+--
+--     > Just 11
+--
+-- That is, 6 * 11 = 66, and 66 `mod` 13 == 1 . Note that only elements coprime to the modulus will have inverses; in cases that do not match this criterion, we return Nothing.
+
+multiplicative_inverse :: Integer -> Integer -> Maybe Integer
+multiplicative_inverse m g =
+	if coprime m g
+		then Just (pow_mod m g (m - 2))
+		else Nothing
+
+-- ---------------------------------------------------------------------
+-- Assorted functions
+
 -- | An infinite list of the Fibonacci numbers.
 fibs :: [Integer]
 fibs = 1 : 1 : zipWith (+) fibs (tail fibs)
@@ -272,3 +429,120 @@ is_int x = x == (fromInteger . round $ x)
 -- | Converts a @Double@ to an @Integer@.
 double_to_int :: Double -> Integer
 double_to_int = (toInteger . round)
+
+type RowAndRHS = ([Double], Double)
+type LinearSystem = [RowAndRHS]
+-- | Solves a given system of linear equations. Can be subject to rounding errors. Here's an example:
+--
+--
+--     > solve_linear_system [[2, 3, 4],[6, -3, 9],[2, 0, 1]] [20, -6, 8]
+--
+--     > [4.999999999999999,6.0,-2.0]
+solve_linear_system :: [[Double]] -> [Double] -> [Double]
+solve_linear_system a b
+	= map (\n -> if n == 0 then 0 else n)
+	. solve_row_echelon_system
+	. map (ZList.map_fst (map epsilon_round))
+	. perform_gaussian_elimination 0
+	$ zip a b
+
+epsilon_round :: Double -> Double
+epsilon_round n
+	= if (abs $ (fromIntegral . round $ n) - n) < epsilon
+		then fromIntegral . round $ n
+		else n
+	where
+		epsilon :: Double
+		epsilon = 0.0001
+
+(<+>) :: RowAndRHS -> RowAndRHS -> RowAndRHS
+a@(a1, a2) <+> b@(b1, b2) = (zipWith (+) a1 b1, a2 + b2)
+
+scale :: Double -> RowAndRHS -> RowAndRHS
+scale s (a, b) =
+	( map ((*) s) a
+	, (*) s b )
+
+solve_row_echelon_system :: LinearSystem -> [Double]
+solve_row_echelon_system [] = []
+solve_row_echelon_system (curr : rest)
+	= curr_solved : rest_solved
+	where
+		curr_solved :: Double
+		curr_solved = solve_row_echelon_system_row curr rest_solved
+
+		rest_solved :: [Double]
+		rest_solved = solve_row_echelon_system rest
+
+-- e.g.
+--     (row, rhs)    = ([2.0,1.0,-1.0], 8.0)
+--     solved_coeffs = [3,-1]
+solve_row_echelon_system_row :: RowAndRHS -> [Double] -> Double
+solve_row_echelon_system_row (row', rhs) []
+	= snd . normalize $ (row', rhs)
+solve_row_echelon_system_row (row', rhs) solved_coeffs
+	= snd
+	. normalize
+	$ List.foldl'
+		f
+		(row, rhs)
+		(zip [0..] scalars)
+	where
+		f :: RowAndRHS -> (Int, Double) -> RowAndRHS
+		f (r, x) (i, s)
+			= (<+>) (make_row_and_rhs i)
+			. scale s
+			$ (r, x)
+
+		make_row_and_rhs :: Int -> RowAndRHS
+		make_row_and_rhs i =
+			((replicate (i+1) 0)
+				++ [1]
+				++ (replicate (length row - i - 2) 0)
+			, solved_coeffs !! i)
+
+		-- parallel to solved_coeffs
+		scalars :: [Double]
+		scalars
+			= (:) (head individual_scalars)
+			$ zipWith (/) (tail individual_scalars) individual_scalars
+			where
+				individual_scalars :: [Double]
+				individual_scalars
+					= tail
+					$ map (\r -> -1 / r) row
+
+		row :: [Double]
+		row = dropWhile ((==) 0) row'
+
+perform_gaussian_elimination :: Int -> LinearSystem -> LinearSystem
+perform_gaussian_elimination row system
+	| ((row + 1) == (length system) - 1) = initial ++ [scale_and_add (last initial) (head system')]
+	| otherwise = perform_gaussian_elimination (succ row) (initial ++ rest)
+		where
+			initial :: LinearSystem
+			initial = take (row + 1) system
+
+			system' :: LinearSystem
+			system' = drop (row + 1) system
+
+			rest :: LinearSystem
+			rest
+				= zipWith scale_and_add
+					system'
+					(repeat $ last initial)
+
+			scale_and_add :: RowAndRHS -> RowAndRHS -> RowAndRHS
+			scale_and_add one two = one <+> (scale scalar two)
+				where
+					scalar :: Double
+					scalar = -1 * (((fst one) !! row) / ((fst two) !! row))
+
+normalize :: RowAndRHS -> RowAndRHS
+normalize (row, rhs) = (map f row, rhs / scalar)
+	where
+		f :: Double -> Double
+		f n = if n /= 0 then 1 else 0
+
+		scalar :: Double
+		scalar = fromJust . List.find ((/=) 0) $ row

@@ -12,22 +12,25 @@
 -- Maintainer  : bgwines@cs.stanford.edu
 -- Stability   : experimental
 -- Portability : portable
--- 
+--
 -- A typeclass with default implementation for graphing trees with <https://hackage.haskell.org/package/graphviz Haskell GraphViz>. It is intended to be extremely straightforward to graph your data type; you only need to define one simple function (example implementation below).
 --
 
 module Zora.Graphing.DAGGraphing
 ( DAGGraphable
-, graph
+, render
+, to_dotfile
+, render_dotfile
 , expand
 ) where
 
-import Shelly
+import Shelly (shelly, run_, setStdin)
 import System.Directory (removeFile, getDirectoryContents)
 import Control.Exception
 import System.IO.Error hiding (catch)
 
 import Data.Maybe
+import Data.String (fromString)
 import Data.Tuple
 
 import Data.Monoid
@@ -47,29 +50,28 @@ import Data.Word
 type Label = Int
 
 -- | A typeclass for tree-like algebraic data types that are able to be graphed.
---
--- For these descriptions, assume the following example data type:
--- 
--- > data Tree a = Empty | Leaf a | Node a (Tree a) (Tree a)
--- 
 class DAGGraphable g where
-	-- | Expands a node into its show_node and children. For example,
-	-- 
+	-- | Expands a node into its show_node and children. For example, with the following example data type
+	--
+	-- > data Tree a = Empty | Leaf a | Node a (Tree a) (Tree a)
+	--
+	-- , you might have the following definition:
+	--
 	-- > expand (Empty) = Nothing
-	-- > expand (Leaf x) = Just (show x, [])
-	-- > expand (Node x l r) = Just (show x, [("L child", l), ("R child", r)])
+	-- > expand (Leaf x) = Just (Just $ show x, [])
+	-- > expand (Node x l r) = Just (Just $ show x, [("L child", l), ("R child", r)])
 	expand :: g -> Maybe (Maybe String, [(Maybe String, g)])
 
 -- | Returns whether a node is empty. Sometimes, when declaring algebraic data types, it is desirable to have an \"Empty\" show_node constructor. If your data type does not have an \"Empty\" show_node constructor, just always return @False@.
--- 
+--
 -- > is_empty Empty = True
 -- > is_empty _ = False
 is_empty :: (DAGGraphable g) => g -> Bool
 is_empty = isNothing . expand
 
--- | Gets the show_node contained in a node. For example,
--- 
--- > show_node (Empty) = error "Empty nodes don't contain show_nodes."
+-- | Gets the contents of a node as a string, if it exists. For example,
+--
+-- > show_node (Empty) = error "Empty nodes don't contain values."
 -- > show_node (Leaf x) = Just x
 -- > show_node (Node x _ _) =
 -- >     if x == 0
@@ -77,27 +79,21 @@ is_empty = isNothing . expand
 -- >         else Just x
 show_node :: (DAGGraphable g) => g -> Maybe String
 show_node node = if is_empty node
-	then error "DAGGraphable implementation error. We shouldn't be calling this function for an empty node."
+	then error "Zora implementation error. We shouldn't be calling this function for an empty node."
 	else fst . fromJust . expand $ node
 
 -- | Gets the children of the current node together with edge label information. For example,
--- 
+--
 -- > get_children (Empty) = error "Empty nodes don't have children."
 -- > get_children (Leaf _) = []
 -- > get_children (Node _ childrenMap) = map (show . fst) . toList $ childrenMap
 get_children :: (DAGGraphable g) => g -> [(Maybe String, g)]
 get_children node =
 	if is_empty node
-		then error "DAGGraphable implementation error. We shouldn't be calling this function for an empty node."
+		then error "Zora implementation error. We shouldn't be calling this function for an empty node."
 		else snd . fromJust . expand $ node
 
-zoldMap :: (Monoid m, DAGGraphable g) => (g -> m) -> g -> m
-zoldMap f node =
-	if is_empty node
-		then mempty
-		else (f node) `mappend` (mconcat . map (zoldMap f) . map snd . get_children $ node)
-
--- | Returns a @String@ to be put into a .dot file for the given @DAGGraphable@ type. You shouldn't need to override this implementation.
+-- | Not exposed. Returns a @String@ to be put into a .dot file for the given @DAGGraphable@ type. You shouldn't need to override this implementation.
 as_graph :: forall g. (Eq g, Show g, DAGGraphable g) => g -> ([LNode Ly.Text], [LEdge Ly.Text])
 as_graph g = (nodes, edges)
 	where
@@ -116,6 +112,12 @@ as_graph g = (nodes, edges)
 			. L.nub
 			. zoldMap (\a -> [a])
 			$ g
+			where
+				zoldMap :: (Monoid m, DAGGraphable g) => (g -> m) -> g -> m
+				zoldMap f node =
+					if is_empty node
+						then mempty
+						else (f node) `mappend` (mconcat . map (zoldMap f) . map snd . get_children $ node)
 
 		edges :: [LEdge Ly.Text]
 		edges = concatMap edgeify nodes_in_g
@@ -126,7 +128,7 @@ as_graph g = (nodes, edges)
 			. filter (not . is_empty . snd)
 			. get_children
 			$ node
-			where 
+			where
 				make_edge :: (Maybe String, g) -> LEdge Ly.Text
 				make_edge (str, child) =
 					( get_label node
@@ -141,9 +143,9 @@ as_graph g = (nodes, edges)
 					$ zip nodes_in_g [0..]
 
 -- TODO: Multiple trees (e.g. binomial heaps / random access lists)
--- | Returns a @String@ to be put into a @.dot@ file for the given @DAGGraphable@ type. You won't need to override this implementation.
-as_dotfile :: forall g. (Eq g, Show g, DAGGraphable g) => g -> String
-as_dotfile
+-- | Returns a @String@ to be put into a <http://en.wikipedia.org/wiki/DOT_(graph_description_language) DOT> file for the given @DAGGraphable@ type.
+to_dotfile :: forall g. (Eq g, Show g, DAGGraphable g) => g -> String
+to_dotfile
 	= Ly.unpack
 	. printDotGraph
 	. graphToDot params
@@ -169,56 +171,13 @@ as_dotfile
 									, Width  0.1
 									, Height 0.1 ] ]
 
--- | Graphs the given @DAGGraphable@ data type. Output is written to a file named \"graph-i.dot\", where /i/ is the successor of the highest /i/-show_node of all existing \"graph-i.dot\" files in the current directory.You won't need to override this implementation.
-graph :: (Eq g, Show g, DAGGraphable g) => g -> IO String
-graph g = do
-	outfile_name <- calc_outfile_name
-	write_dot_file
-	run_dot_cmd
-	remove_dot_file
-	return ("Graphed data structure to " ++ outfile_name)
-	where
-		calc_outfile_name :: IO String
-		calc_outfile_name = do
-			index <- calc_index_of_graph_file
-			return $ "graph-" ++ index ++ ".png"
-			where
-				calc_index_of_graph_file :: IO String
-				calc_index_of_graph_file = do
-					existing_graph_files_in_dir <- calc_existing_graph_files_in_dir
-					return
-						. show
-						. (+) 1
-						. (\s -> read s :: Integer)
-						. takeWhile ((/=) '.')
-						. drop 6 -- length "graph-"
-						. last
-						. L.sort
-						. ((:) "graph--1")
-						$ existing_graph_files_in_dir
-				
-				calc_existing_graph_files_in_dir :: IO [String]
-				calc_existing_graph_files_in_dir = do
-					directory_contents <- (getDirectoryContents "." :: IO [String])
-					return . filter is_graph_file $ directory_contents
-					where
-						is_graph_file :: String -> Bool
-						is_graph_file = starts_with "graph-"
+-- | Graphs the given string as if it were the contents of a <http://en.wikipedia.org/wiki/DOT_(graph_description_language) DOT> file. Output is written to the specified file. The first parameter is the outfile name, and the second is the contents of the dotfile.
+render_dotfile :: String -> String -> IO ()
+render_dotfile outfile_name dotfile = shelly $ do
+  setStdin (Tx.pack dotfile)
+  Shelly.run_ "dot" ["-Tpng", "-o", fromString outfile_name]
 
-						starts_with :: String -> String -> Bool
-						starts_with prefix str = take (length prefix) str == prefix
 
-		run_dot_cmd :: IO ()
-		run_dot_cmd = do
-			outfile_name <- calc_outfile_name
-			shelly $ do cmd "dot" "-Tpng" "graph.dot" (Tx.pack $ "-o" ++ outfile_name)
-
-		write_dot_file :: IO ()
-		write_dot_file = do writeFile "graph.dot" $ as_dotfile g
-
-		remove_dot_file :: IO ()
-		remove_dot_file = removeFile "graph.dot" `catch` handleExists
-			where
-				handleExists e = if isDoesNotExistError e
-					then return ()
-					else throwIO e
+-- | Graphs the given @DAGGraphable@ data type to a PDF file. Output is written to the specified file. This is a convenience function that is the composition of @render_dotfile@ and @to_dotfile@.
+render :: (Eq g, Show g, DAGGraphable g) => String -> g -> IO ()
+render outfile_name = render_dotfile outfile_name . to_dotfile

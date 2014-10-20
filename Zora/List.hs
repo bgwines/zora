@@ -48,6 +48,7 @@ module Zora.List
 , find_and_rest
 , subsequences
 , contiguous_subsequences
+, contiguous_subsequences_of_length
 
 -- * Sorting
 , is_sorted
@@ -61,15 +62,18 @@ module Zora.List
 , bsearch
 , bsearch_1st_geq
 , elem_counts
+, elem_counts_by
 , running_bests
 , running_bests_by
 , (<$*>)
 , ($$)
 , interleave
+, passing_index_elems
 , count
 , map_keep
 , maximum_with_index
 , minimum_with_index
+, maxima_by
 , minima_by
 , length'
 , drop'
@@ -81,6 +85,10 @@ module Zora.List
 , map_fst
 , map_snd
 , map_pair
+, map_pair_same
+, map_triple
+, zip_with_pair
+, zip_with_pair_same
 , fst3
 , snd3
 , trd3
@@ -93,6 +101,8 @@ import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 
 import System.Random
+
+import Debug.Trace
 
 import Control.Applicative
 
@@ -152,7 +162,14 @@ powerpartition l@(x:xs) =
 
 -- | /O(n log(n))/ Removes duplicate elements. Like `Data.List.nub`, but for `Ord` types, so it can be faster.
 uniqueify :: (Ord a) => [a] -> [a]
-uniqueify = Set.elems . Set.fromList
+uniqueify = Set.toList . Set.fromList
+
+-- | /O(n log(n))/ Removes duplicate elements according to the given comparator function. Like `Data.List.nub`, but for `Ord` types, so it can be faster.
+uniqueify_by :: (Ord a) => (a -> a -> Ordering) -> [a] -> [a]
+uniqueify_by cmp
+    = map head
+    . List.groupBy (\x y -> EQ == (cmp x y))
+    . List.sortBy cmp
 
 -- | /O(n)/ Zips the list up into pairs. For example,
 -- 
@@ -411,6 +428,31 @@ contiguous_subsequences = (:) [] . concatMap (tail . List.inits) . List.tails
 subsequences :: [a] -> [[a]]
 subsequences = map reverse . powerset
 
+-- | /O(n)/ Retuns all contiguous subsequences of the given length. E.g.:
+--
+--     > contiguous_subsequences_of_length 3 "1234567890"
+--     ["123","234","345","456","567","678","789","890"]
+contiguous_subsequences_of_length :: (Show a) => Integer -> [a] -> [[a]]
+contiguous_subsequences_of_length len
+    = contiguous_subsequences_of_length' len []
+    where
+        contiguous_subsequences_of_length' :: forall a. (Show a) => Integer -> [[a]] -> [a] -> [[a]]
+        contiguous_subsequences_of_length' len so_far []
+            = filter ((==) len . length') so_far
+        contiguous_subsequences_of_length' len so_far (x:xs)
+            = of_length ++ (contiguous_subsequences_of_length' len not_of_length xs)
+            where
+                of_length :: [[a]]
+                of_length = filter ((==) len . length') so_far
+
+                not_of_length :: [[a]]
+                not_of_length
+                    = map (flip (++) $ [x])
+                    . (:) []
+                    $ (filter ((/=) len . length') so_far)
+
+
+
 -- ---------------------------------------------------------------------
 -- Sorting
 
@@ -461,6 +503,21 @@ elem_counts
     . List.group
     . List.sort
 
+-- | /O(nlog(n))/ Counts the number of time each element appears in the given list. For example:
+--
+--  > elem_counts [1,2,1,4] == [(1,2),(2,1),(4,1)]
+elem_counts_by :: (Ord b) => (a -> b) -> [a] -> [(a, Integer)]
+elem_counts_by cmp
+    = map (\l -> (head l, length' l))
+    . List.groupBy (\a b -> cmp a == cmp b)
+    . List.sortBy (Ord.comparing cmp)
+
+-- | Shorthand for applying the same parameter twice.
+--
+--  > f $$ x = f x x
+($$) :: (a -> a -> b) -> a -> b
+f $$ a = f a a
+
 -- | Shorthand for applicative functors:
 --
 --  > f <$*> l = f <$> l <*> l
@@ -476,7 +533,7 @@ bsearch f = bsearch' f lb ub
             = last
             . takeWhile (\n -> (f n) == LT)
             . map (\e -> 2^e)
-            $ [1..]
+            $ [0..]
 
         ub :: Integer
         ub = lb * 2
@@ -504,7 +561,7 @@ bsearch_1st_geq f = bsearch_1st_geq' f lb ub
             = last
             . takeWhile (\n -> (f n) == LT)
             . map (\e -> 2^e)
-            $ [1..]
+            $ [0..]
 
         ub :: Integer
         ub = lb * 2
@@ -556,7 +613,7 @@ interleave [] bs = bs
 interleave as [] = as
 interleave (a:as) (b:bs) = a : b : (interleave as bs)
 
--- /O(nf)/ Filters a list of length `n` leaving elemnts the indices of which satisfy the given predicate function, which has runtime `f`.
+-- | /O(nf)/ Filters a list of length `n` leaving elemnts the indices of which satisfy the given predicate function, which has runtime `f`.
 passing_index_elems :: (Int -> Bool) -> [a] -> [a]
 passing_index_elems f
     = map snd
@@ -620,6 +677,12 @@ minima_by cmp (x:xs) = minima_by' cmp xs [x]
                 EQ -> minima_by' cmp xs (x : so_far)
                 GT -> minima_by' cmp xs so_far
 
+-- | /O(n)/ Finds all maxima of the given list by the given comparator function. For example,
+--   > maxima_by (Data.Ord.comparing length) [[1,2], [1], [3,3], [2]]
+--   [[1,2], [3,3]]
+maxima_by :: (a -> a -> Ordering) -> [a] -> [a]
+maxima_by cmp = minima_by (flip cmp)
+
 -- ---------------------------------------------------------------------
 -- Tuples
 
@@ -634,6 +697,24 @@ map_snd = map_pair id
 -- | Applies the given two functions to the respective first and second elements of the tuple.
 map_pair :: (a -> c) -> (b -> d) -> (a, b) -> (c, d)
 map_pair f g (a, b) = (f a, g b)
+
+-- | Applies the given function to the first and second elements of the tuple.
+map_pair_same :: (a -> b) -> (a, a) -> (b, b)
+map_pair_same f (a, b) = (f a, f b)
+
+-- | Applies the given function to respectively the first and second elements of the two tuple. For example,
+-- 
+--     > zip_with_pair (*) (^) (2,3) (5,4) == (10,27)
+zip_with_pair :: (a -> c -> e) -> (b -> d -> f) -> (a, b) -> (c, d) -> (e, f)
+zip_with_pair f g (a, b) (c, d) = (f a c, g b d)
+
+-- | Like `zip_with_pair`, but re-using the same function.
+zip_with_pair_same :: (a -> b -> c) -> (a, a) -> (b, b) -> (c, c)
+zip_with_pair_same f (a, a') (b, b') = (f a b, f a' b')
+
+-- | Applies the given three functions to the respective first, second, and third elements of the tuple.
+map_triple :: (a -> d) -> (b -> e) -> (c -> f) -> (a, b, c) -> (d, e, f)
+map_triple f g h (a, b, c) = (f a, g b, h c)
 
 -- | Extracts the first element of a 3-tuple.
 fst3 :: (a, b, c) -> a

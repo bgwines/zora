@@ -1,5 +1,5 @@
 Name:		   Zora
-Version:	   1.1.11
+Version:	   1.1.18
 Synopsis:      Graphing library wrapper + assorted useful functions 
 Description:   A library of assorted useful functions for working with lists, doing mathematical operations and graphing custom data types.
 Category:      Unclassified
@@ -8,7 +8,7 @@ License:	   BSD3
 License-File:  LICENSE
 Stability:	Experimental
 Author:		Brett Wines
-Maintainer: brettwines@gmail.com
+Maintainer: bgwines@cs.stanford.edu
 Homepage:	http://github.com/bgwines/zora
 Build-Type: Simple
 Source-Repository head

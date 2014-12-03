@@ -14,14 +14,14 @@ catchIO = Exception.catch
 
 
 version :: Version
-version = Version {versionBranch = [1,1,18], versionTags = []}
+version = Version {versionBranch = [1,1,19], versionTags = []}
 bindir, libdir, datadir, libexecdir, sysconfdir :: FilePath
 
-bindir     = "/Users/brett/Library/Haskell/bin"
-libdir     = "/Users/brett/Library/Haskell/ghc-7.8.3-x86_64/lib/Zora-1.1.18"
-datadir    = "/Users/brett/Library/Haskell/share/ghc-7.8.3-x86_64/Zora-1.1.18"
-libexecdir = "/Users/brett/Library/Haskell/libexec"
-sysconfdir = "/Users/brett/Library/Haskell/etc"
+bindir     = "/Users/brett/.cabal/bin"
+libdir     = "/Users/brett/.cabal/lib/x86_64-osx-ghc-7.8.3/Zora-1.1.19"
+datadir    = "/Users/brett/.cabal/share/x86_64-osx-ghc-7.8.3/Zora-1.1.19"
+libexecdir = "/Users/brett/.cabal/libexec"
+sysconfdir = "/Users/brett/.cabal/etc"
 
 getBinDir, getLibDir, getDataDir, getLibexecDir, getSysconfDir :: IO FilePath
 getBinDir = catchIO (getEnv "Zora_bindir") (\_ -> return bindir)

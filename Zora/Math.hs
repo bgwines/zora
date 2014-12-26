@@ -132,18 +132,9 @@ prime_miller_rabin' n a =
 prime :: Integer -> Bool
 prime n = (factor n) == [n]
 
--- | /O(min(n, m))/ Returns whether the the two parameters are <http://en.wikipedia.org/wiki/Coprime coprime>, that is, whether they share any divisors.
+-- | /O(min(n, m) (mod 10))/ Returns whether the the two parameters are <http://en.wikipedia.org/wiki/Coprime coprime>, that is, whether they share any divisors.
 coprime :: Integer -> Integer -> Bool
-coprime a b = isNothing .  List.find is_common_divisor $ [2..(min a' b')]
-	where
-		a' :: Integer
-		a' = abs a
-
-		b' :: Integer
-		b' = abs b
-
-		is_common_divisor :: Integer -> Bool
-		is_common_divisor n = (a `mod` n == 0) && (b `mod` n == 0)
+coprime a b = (gcd a b) == 1
 
 -- | /O(1)/ @phi(p^a)@ for prime @p@ and nonnegative @a@.
 euler_phi_for_powers_of_primes :: (Integer, Integer) -> Integer

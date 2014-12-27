@@ -11,6 +11,8 @@
 -- Assorted mathematical functions.
 --
 
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Zora.Math
 ( -- * Prime numbers and division
   primes
@@ -38,6 +40,7 @@ module Zora.Math
 , sub_mod
 , mul_mod
 , div_mod
+, div_mod_prime
 , pow_mod
 , multiplicative_inverse
 
@@ -133,7 +136,7 @@ prime :: Integer -> Bool
 prime n = (factor n) == [n]
 
 -- | /O(min(n, m) (mod 10))/ Returns whether the the two parameters are <http://en.wikipedia.org/wiki/Coprime coprime>, that is, whether they share any divisors.
-coprime :: Integer -> Integer -> Bool
+coprime :: (Integral a) => a -> a -> Bool
 coprime a b = (gcd a b) == 1
 
 -- | /O(1)/ @phi(p^a)@ for prime @p@ and nonnegative @a@.
@@ -282,7 +285,7 @@ continued_fraction_sqrt n
 			a0 = floor . sqrt . fromInteger $ n
 
 -- | Determines whether the given integer is a square number.
-square :: Integer -> Bool
+square :: (Integral a) => a -> Bool
 square = is_int . sqrt . fromIntegral
 
 -- | Takes the square root of a perfect square.
@@ -292,12 +295,13 @@ sqrt_perfect_square = toInteger . ceiling . sqrt . fromInteger
 -- ---------------------------------------------------------------------
 -- Assorted functions
 
-pow :: Integer -> Integer -> (Integer -> Integer -> Integer) -> (Integer -> Integer) -> Integer
+
+pow :: forall a . (Integral a) => a -> a -> (a -> a -> a) -> (a -> a) -> a
 pow b 0 _ _ = 1
 pow b 1 _ _ = b
 pow b_original e_original mul sq = pow' b_original e_original 1
 	where
-		pow' :: Integer -> Integer -> Integer -> Integer
+		pow' :: (Integral a) => a -> a -> a -> a
 		pow' b e curr_e
 			= if curr_e == e
 				then b
@@ -311,10 +315,10 @@ pow b_original e_original mul sq = pow' b_original e_original 1
 --     > pow_mod 13 2 4
 --
 --     > 3 
-pow_mod :: Integer -> Integer -> Integer -> Integer
+pow_mod :: forall a . (Integral a) => a -> a -> a -> a
 pow_mod m b e = pow b e (mul_mod m) (square_mod m)
 	where
-		square_mod :: Integer -> Integer -> Integer
+		square_mod :: (Integral a) => a -> a -> a
 		square_mod m a = (a * a) `mod` m
 
 -- | Multiplies the second parameter by the third, mod the first. E.g.:
@@ -323,7 +327,7 @@ pow_mod m b e = pow b e (mul_mod m) (square_mod m)
 --     > mul_mod 5 2 4
 --
 --     > 3
-mul_mod :: Integer -> Integer -> Integer -> Integer
+mul_mod :: (Integral a) => a -> a -> a -> a
 mul_mod m a b = (a * b) `mod` m
 
 -- | Adds the second parameter by the third, mod the first. E.g.:
@@ -332,7 +336,7 @@ mul_mod m a b = (a * b) `mod` m
 --     > add_mod 5 3 4
 --
 --     > 2
-add_mod :: Integer -> Integer -> Integer -> Integer
+add_mod :: (Integral a) => a -> a -> a -> a
 add_mod m a b = (a + b) `mod` m
 
 -- | Subtracts the third parameter from the second, mod the first. E.g.:
@@ -341,7 +345,7 @@ add_mod m a b = (a + b) `mod` m
 --     > sub_mod 5 16 7
 --
 --     > 4
-sub_mod :: Integer -> Integer -> Integer -> Integer
+sub_mod :: (Integral a) => a -> a -> a -> a
 sub_mod m a b = (a - b) `mod` m
 
 -- | Divides the second parameter by the third, mod the first. More explicitly, it multiplies the second by the multiplicative inverse of the third, mod the first. E.g.:
@@ -352,17 +356,17 @@ sub_mod m a b = (a - b) `mod` m
 --     > Just 3
 --
 -- Note that only elements coprime to the modulus will have inverses; in cases that do not match this criterion, we return Nothing.
-div_mod :: Integer -> Integer -> Integer -> Maybe Integer
+div_mod :: forall a . (Integral a) => a -> a -> a -> Maybe a
 div_mod m a b =
 	if isJust b'
 		then Just (mul_mod m a (fromJust b'))
 		else Nothing
 		where
-			b' :: Maybe Integer
+			b' :: Maybe a
 			b' = multiplicative_inverse m b
 
 -- | Like @div_mod@, but with the assurance that the modulus is prime (i.e. denominator will have an inverse). Thus, the returnvalue doesn't need to be wrapped in a @Maybe@.
-div_mod_prime :: Integer -> Integer -> Integer -> Integer
+div_mod_prime :: (Integral a) => a -> a -> a -> a
 div_mod_prime m a b = fromJust (div_mod m a b)
 
 -- | /O(log m)/ Computes the multiplicative inverse of the second parameter, in the group /Z_m/, where /m/ is the first parameter. E.g.:
@@ -373,12 +377,25 @@ div_mod_prime m a b = fromJust (div_mod m a b)
 --     > Just 11
 --
 -- That is, 6 * 11 = 66, and 66 `mod` 13 == 1 . Note that only elements coprime to the modulus will have inverses; in cases that do not match this criterion, we return Nothing.
-
-multiplicative_inverse :: Integer -> Integer -> Maybe Integer
+multiplicative_inverse :: forall a . (Integral a) => a -> a -> Maybe a
 multiplicative_inverse m g =
 	if coprime m g
-		then Just (pow_mod m g (m - 2))
+		then Just $ inverse m g
 		else Nothing
+		where
+			inverse :: a -> a -> a
+			inverse n a = n + (inverse' (0, 1, n, a))
+
+			inverse' :: (a, a, a, a) -> a
+			inverse' (t, newt, r, 0) = t
+			inverse' (t, newt, r, newr) = inverse'
+				( newt
+				, t - quotient * newt
+				, newr
+				, r - quotient * newr )
+				where
+					quotient :: a
+					quotient = r `div` newr
 
 -- ---------------------------------------------------------------------
 -- Assorted functions

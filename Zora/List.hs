@@ -353,21 +353,14 @@ merge :: (Ord a) => [a] -> [a] -> [a]
 merge = merge_by compare
 
 -- | /O(max(n, m))/ Merges the two given sorted lists of respective lengths /n/ and /m/, comparing elements in between the two lists with the given comparator function.
-merge_by :: (Ord a) => (a -> a -> Ordering) -> [a] -> [a] -> [a]
-merge_by cmp as bs
-    | length as == 0 = bs
-    | length bs == 0 = as
-    | otherwise =
-        let
-            a = head as
-            b = head bs
-            as' = tail as
-            bs' = tail bs
-        in
-            case cmp a b of
-                    LT -> a : merge_by cmp as' bs
-                    EQ -> a : merge_by cmp as' bs
-                    GT -> b : merge_by cmp as  bs'
+merge_by :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
+merge_by cmp [] bs = bs
+merge_by cmp as [] = as
+merge_by cmp as@(a:as') bs@(b:bs') =
+    case cmp a b of
+            LT -> a : merge_by cmp as' bs
+            EQ -> a : merge_by cmp as' bs
+            GT -> b : merge_by cmp as  bs'
 
 
 -- | /O(min(n, m))/ Zips the two given lists of respective lengths /n/ and /m/ as long as the pairs satisfy the given predicate function.

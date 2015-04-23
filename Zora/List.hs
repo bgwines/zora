@@ -390,17 +390,17 @@ take_while_keep_last :: (a -> Bool) -> [a] -> [a]
 take_while_keep_last f [] = []
 take_while_keep_last f (x:xs) =
     if f x
-        then [x]
-        else x : take_while_keep_last f xs
+        then x : take_while_keep_last f xs
+        else [x]
 
 -- | /(O(n))/ Returns a pair where the first element is identical to what `takeWhile` returns and the second element is the rest of the list
 -- 
 -- > take_while_and_rest (<3) [1..10] == ([1,2],[3,4,5,6,7,8,9,10])
 take_while_and_rest :: (a -> Bool) -> [a] -> ([a], [a])
 take_while_and_rest f [] = ([], [])
-take_while_and_rest f l@(x:xs) = if not . f $ x
-    then ([], l)
-    else (x:(fst rec), snd rec)
+take_while_and_rest f l@(x:xs) = if f x
+    then (x:(fst rec), snd rec)
+    else ([], l)
     where
         rec = take_while_and_rest f xs
 

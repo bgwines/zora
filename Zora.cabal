@@ -1,5 +1,5 @@
 Name:		   Zora
-Version:	   1.1.23
+Version:	   1.2.0
 Synopsis:      Graphing library wrapper + assorted useful functions 
 Description:   A library of assorted useful functions for working with lists, doing mathematical operations and graphing custom data types.
 Category:      Unclassified
@@ -25,16 +25,16 @@ Library
     graphviz,
     fgl,
     shelly >= 1.5.4.1,
-    directory
+    directory,
+    random
 
   Exposed-Modules:
     Zora.List
     Zora.Math
-    Zora.Graphing.TreeGraphing
     Zora.Graphing.DAGGraphing
 
 Test-Suite test-zora
     type:       exitcode-stdio-1.0
     main-is:    Tests/test-zora.hs
-    build-depends: base >= 4 && < 5, Zora
+    build-depends: base >= 4 && < 5, Zora, tasty-hunit, tasty, containers, random
     default-language:    Haskell2010

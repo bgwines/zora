@@ -6,4 +6,4 @@ before_install:
   - cabal sandbox init
 
 script:
-  - cabal configure && cabal build
+  - cabal configure --enable-tests && cabal build && cabal test
